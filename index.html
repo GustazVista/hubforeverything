@@ -105,13 +105,21 @@ label{display:block;font:10px var(--px);color:var(--a2);margin:12px 0 4px}
 .pa{position:absolute;bottom:8px;left:8px;display:flex;gap:4px;opacity:0;transition:opacity .15s}.pol:hover .pa{opacity:1}
 .pa button{background:var(--ink);color:var(--ac);border:0;cursor:pointer;padding:0 7px;font:14px/1.3 var(--px)}
 @media(hover:none){.pa{opacity:.85}.pb.has .slot.empty{opacity:.7}}
+main{position:relative}
+#sl{position:absolute;left:0;right:0;bottom:0;pointer-events:none;z-index:8;overflow:hidden}
+#sl .note{position:absolute;width:220px;max-width:none;pointer-events:auto;transition:left .07s,top .07s,transform .15s;transform:rotate(var(--r,0deg))}
+#sl .pol{position:absolute;width:150px;pointer-events:auto;cursor:grab;touch-action:none;transition:left .07s,top .07s}
+#sl .drag{transition:none!important;cursor:grabbing;box-shadow:8px 10px 0 rgba(0,0,0,.35);transform:rotate(0)}
+#sl .dh{left:0;top:0;right:26px;height:24px;padding:5px 6px 0 18px;font:9px var(--px);cursor:grab;touch-action:none;opacity:.7;color:var(--ink)}
+#sl .dh:active{cursor:grabbing}
 </style></head>
 <body><div id="app"><aside><div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>KNOWLEDGE//HUB</span></div><nav id="nav"></nav></aside>
 <main><header><button class="btn ic" data-a="tog" title="Toggle sidebar"><i data-lucide="panel-left"></i></button>
 <button class="btn srch" data-a="srch"><i data-lucide="search"></i><span>Search everything…</span><kbd>Ctrl K</kbd></button><span style="flex:1"></span>
+<button class="btn sbtn" data-a="sadd" title="Add a sticky note">+ NOTE</button><button class="btn sbtn" data-a="iadd" title="Add a picture sticker">+ IMAGE</button><button class="btn ic sbtn" data-a="shide" title="Show / hide stickers"><i data-lucide="eye"></i></button>
 <button class="btn ic" data-a="theme" title="Theme"><i data-lucide="sun-moon"></i></button>
 <button class="btn pri" data-a="qa"><i data-lucide="plus"></i><span class="lbb">Quick add</span></button></header>
-<div id="body"></div></main></div><div id="mo"></div>
+<div id="body"></div><div id="sl"></div></main></div><div id="mo"></div>
 <script>
 const SC={
 university:{l:'My University',i:'graduation-cap',f:[['name','University name','text',1],['platform','Learning platform (Moodle, Canvas, HEMIS…)'],['platformUrl','Platform link','url'],['portal','Student portal link','url'],['major','Major / program'],['year','Year / semester'],['gpa','Current GPA'],['notes','Notes','textarea']]},
@@ -261,7 +269,8 @@ function sets(){return `<h1>Settings</h1><br>${designs()}<div class="cd"><h2>Exp
 function render(){const g=(h,a)=>`<div class="gh">${h}</div>`+a.map(([k,l,i,n])=>`<button class="nv ${view==k?'on':''}" data-go="${k}" title="${l}">${ic(i)}<span class="lb">${l}</span>${n?`<em class="lb">${n}</em>`:''}</button>`).join('');
 $('#app').className=col?'c':'';
 $('#nav').innerHTML=g('Main',[['dashboard','Dashboard','layout-dashboard'],['favorites','Favorites','star',db.filter(x=>x.fav).length||''],['calendar','Calendar & Deadlines','calendar']])+g('Knowledge',Object.entries(SC).map(([k,s])=>[k,s.l,s.i,db.filter(x=>x.type==k).length||'']))+g('Tools',[['library','Library','archive',(GD.files||[]).length||''],['translate','Translator','languages']])+g('System',[['settings','Settings','settings']])+`<div class="gh">Profile</div><button class="nv" data-a="signout" title="Switch profile">${ic('user')}<span class="lb">${esc(me?me.name:'')} · switch</span><em class="lb" id="sy">${me&&me.cloud?SY:''}</em></button>${CU&&me&&!me.cloud?`<button class="nv" data-a="cloud" title="Sync across devices">${ic('cloud')}<span class="lb">Enable cloud sync</span></button>`:''}`;
-$('#body').innerHTML=(view=='dashboard'?'':stickies()+board())+(view=='university'?uni():SC[view]?listView(view):({dashboard:dash,favorites:favs,calendar:cal,settings:sets,library:libv,translate:trv})[view]());
+$('#body').innerHTML=(view=='university'?uni():SC[view]?listView(view):({dashboard:dash,favorites:favs,calendar:cal,settings:sets,library:libv,translate:trv})[view]());
+const SL=$('#sl');SL.style.top=document.querySelector('header').offsetHeight+'px';SL.innerHTML=layerHTML();document.querySelectorAll('.sbtn').forEach(b=>b.style.display=view=='dashboard'?'none':'');
 if(window.lucide)lucide.createIcons()}
 function modal(h){$('#mo').innerHTML=h?`<div class="ov" data-a="x"><div class="md">${h}</div></div>`:'';if(window.lucide)lucide.createIcons()}
 function form(t,id){const S=SC[t],x=db.find(o=>o.id==id)||(t=='university'&&db.find(o=>o.type==t))||{f:{},tags:[],status:S.s?S.s[0]:'',p:0};
@@ -280,6 +289,30 @@ document.addEventListener('dragstart',e=>{const h=e.target.closest&&e.target.clo
 document.addEventListener('dragover',e=>{if(!DR)return;const z=e.target.closest('.slot');if(z&&z.parentElement.classList.contains(DR.k=='n'?'sk':'pb')){e.preventDefault();clr();z.classList.add('over')}});
 document.addEventListener('drop',e=>{if(!DR)return;const z=e.target.closest('.slot');if(z&&z.parentElement.classList.contains(DR.k=='n'?'sk':'pb')){e.preventDefault();moveTo(DR.k,DR.id,+z.dataset.slot)}DR=null;clr()});
 document.addEventListener('dragend',()=>{DR=null;clr()});
+let SH=true,Z=30;
+function defPos(k,i,W,H){const L=$('#sl');W=W||L.clientWidth;H=H||L.clientHeight;const c=i%5;return k=='n'?{x:Math.max(8,W-250-c*30),y:16+c*36}:{x:Math.max(8,W-180-c*30),y:Math.max(8,H-170-c*30)}}
+const noteHTML=(n,p)=>`<div class="note" data-id="${n.id}" style="${p};--r:${n.r||0}deg"><span class="dh" title="Drag to move — it snaps into place">⠿ DRAG</span><button class="x" data-a="sdel" data-id="${n.id}" title="Remove note">×</button><textarea data-sid="${n.id}" placeholder="Sticky note — jot something down…">${esc(n.t)}</textarea>
+${(n.l||[]).map(i=>`<div class="ck"><input type="checkbox" data-cid="${n.id}" data-iid="${i.id}" ${i.d?'checked':''}><input class="ct ${i.d?'d2':''}" data-nid="${n.id}" data-iid="${i.id}" value="${esc(i.t)}" placeholder="List item"><button class="x2" data-a="cdel" data-id="${n.id}" data-i="${i.id}" title="Remove item">×</button></div>`).join('')}
+<div class="nb"><button data-a="cadd" data-id="${n.id}">☐ LIST</button></div></div>`;
+const picHTML=(p,pos)=>`<div class="pol" data-id="${p.id}" style="${pos}"><img src="${p.d}" alt="" draggable="false"><button class="x2" data-a="idel" data-i="${p.id}" title="Remove picture">×</button></div>`;
+function layerHTML(){if(view=='dashboard'||!SH)return '';const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,n=st[view]||[],p=pics[view]||[];let dn=false,dp=false;
+const pos=(it,k,i)=>{if(typeof it.x!='number'||typeof it.y!='number'){Object.assign(it,defPos(k,i,W,H));k=='n'?dn=true:dp=true}return `left:${Math.max(0,Math.min(it.x,W-(k=='n'?220:150)))}px;top:${Math.max(0,Math.min(it.y,H-(k=='n'?150:130)))}px`};
+const h=n.map((o,i)=>noteHTML(o,pos(o,'n',i))).join('')+p.map((o,i)=>picHTML(o,pos(o,'p',i))).join('');if(dn)saveSt();if(dp)savePic();return h}
+const GRID=24,TH=14;
+const snapAxis=(v,c)=>{let b=v,d=TH+1;for(const k of c){const t=Math.abs(k-v);if(t<d){d=t;b=k}}return d<=TH?b:v};
+let PD=null;
+function showPic(id){const p=(pics[view]||[]).find(o=>o.id==id);if(p)modal(`<img src="${p.d}" alt="" style="width:100%;display:block"><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-a="x2">Close</button></div>`)}
+document.addEventListener('pointerdown',e=>{const h=e.target.closest&&e.target.closest('.dh,.pol');if(!h||e.target.closest('button,input,textarea'))return;const el=h.closest('.note,.pol'),k=el.classList.contains('note')?'n':'p',it=(k=='n'?st[view]:pics[view]).find(o=>o.id==el.dataset.id);if(!it)return;
+PD={el,it,k,sx:e.clientX,sy:e.clientY,ox:el.offsetLeft,oy:el.offsetTop,moved:false,id:e.pointerId};el.classList.add('drag');el.style.zIndex=++Z;e.preventDefault()});
+document.addEventListener('pointermove',e=>{if(!PD||e.pointerId!=PD.id)return;const dx=e.clientX-PD.sx,dy=e.clientY-PD.sy;if(Math.abs(dx)+Math.abs(dy)>4)PD.moved=true;if(!PD.moved)return;
+const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,w=PD.el.offsetWidth,h=PD.el.offsetHeight,cx=[8,W-w-8],cy=[8,H-h-8];
+[...L.querySelectorAll('.note,.pol')].filter(o=>o!=PD.el).forEach(o=>{const l=o.offsetLeft,t=o.offsetTop;cx.push(l,l+o.offsetWidth,l-w,l+o.offsetWidth-w);cy.push(t,t+o.offsetHeight,t-h,t+o.offsetHeight-h)});
+for(let g=0;g<=W;g+=GRID)cx.push(g);for(let g=0;g<=H;g+=GRID)cy.push(g);
+const cl=(v,m)=>Math.max(0,Math.min(m,v));const x=cl(snapAxis(cl(PD.ox+dx,W-w),cx),W-w),y=cl(snapAxis(cl(PD.oy+dy,H-h),cy),H-h);
+PD.el.style.left=x+'px';PD.el.style.top=y+'px';PD.nx=x;PD.ny=y});
+const endDrag=()=>{if(!PD)return;const d=PD;PD=null;d.el.classList.remove('drag');if(!d.moved){if(d.k=='p')showPic(d.it.id);return}d.it.x=d.nx;d.it.y=d.ny;d.k=='n'?saveSt():savePic()};
+document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);
+window.addEventListener('resize',()=>{if(SH&&view!='dashboard')$('#sl').innerHTML=layerHTML()});
 document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){$('.mn')?.remove();return go(g.dataset.go)}
 const a=e.target.closest('[data-a]');if(!a){$('.mn')?.remove();return}const A=a.dataset.a,id=a.dataset.id,x=db.find(o=>o.id==id);
 if(A=='x'){if(e.target==a)modal('');return}if(A=='x2')return modal('');
@@ -295,7 +328,8 @@ else if(A=='fav'){x.fav=!x.fav;save();render()}
 else if(A=='vis'){x.visited=Date.now();save();return}
 else if(A=='imp'){try{const v=JSON.parse($('#ex').value);if(!Array.isArray(v))throw 0;db=v;save();render()}catch(_){toast('That is not valid backup JSON.')}}
 else if(A=='clr'){modal(`<h1>Delete all data?</h1><p class="mu">This removes every entry from this browser.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="clr2">Delete all</button></div>`)}
-else if(A=='sadd'){st[view].push({id:uid(),t:'',r:+(Math.random()*5-2.5).toFixed(1),s:+a.dataset.s||0});saveSt();render();document.querySelector('.slot[data-slot="'+(+a.dataset.s||0)+'"] textarea')?.focus()}
+else if(A=='sadd'){const l=st[view]=st[view]||[];l.push({id:uid(),t:'',r:+(Math.random()*4-2).toFixed(1),...defPos('n',l.length)});saveSt();render();document.querySelector('.note[data-id="'+l[l.length-1].id+'"] textarea')?.focus()}
+else if(A=='shide'){SH=!SH;render()}
 else if(A=='tswap'){const f=tr.f=='Auto-detect'?'English':tr.f;tr.f=tr.t;tr.t=f;if(tr.o){tr.i=tr.o;tr.o=''}saveTr();render()}
 else if(A=='tcopy'){const o=$('#to');if(o&&o.value){o.select();try{navigator.clipboard.writeText(o.value)}catch(e){}try{document.execCommand('copy')}catch(e){}}}
 else if(A=='tgo'){if(!tr.i.trim()||tr.b)return;tr.b=true;tr.e='';tr.o='';render();gtr(tr.i,tr.f,tr.t).then(o=>tr.o=o).catch(e=>tr.e=e.message||'Translation failed — try again.').finally(()=>{tr.b=false;if(view=='translate')render()})}
@@ -319,7 +353,7 @@ else if(A=='cadd'){const n=st[view].find(o=>o.id==id);(n.l=n.l||[]).push({id:uid
 else if(A=='cdel'){const n=st[view].find(o=>o.id==id);n.l=n.l.filter(i=>i.id!=a.dataset.i);saveSt();render()}
 else if(A=='idel'){pics[view]=pics[view].filter(p=>p.id!=a.dataset.i);savePic();render()}
 else if(A=='pview'){const p=pics[view].find(o=>o.id==a.dataset.i);modal(`<img src="${p.d}" alt="" style="width:100%;display:block"><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-a="x2">Close</button></div>`)}
-else if(A=='iadd'){const sl=+a.dataset.s||0;const f=document.createElement('input');f.type='file';f.accept='image/*';f.onchange=()=>{const fl=f.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,700/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);(pics[view]=pics[view]||[]).push({id:uid(),s:sl,d:c.toDataURL('image/jpeg',.72)});savePic();render()};im.src=r.result};r.readAsDataURL(fl)};f.click()}
+else if(A=='iadd'){const sl=+a.dataset.s||0;const f=document.createElement('input');f.type='file';f.accept='image/*';f.onchange=()=>{const fl=f.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,700/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);(pics[view]=pics[view]||[]).push({id:uid(),...defPos('p',(pics[view]||[]).length),d:c.toDataURL('image/jpeg',.72)});savePic();render()};im.src=r.result};r.readAsDataURL(fl)};f.click()}
 else if(A=='sdel'){st[view]=st[view].filter(n=>n.id!=id);saveSt();render()}
 else if(A=='clr2'){db=[];save();modal('');render()}});
 document.addEventListener('submit',e=>{e.preventDefault();if(e.target.id=='af'){authSubmit(e.target);return}if(e.target.id=='sf'){subjSave(e.target);return}if(e.target.id=='pf'){const n=new FormData(e.target).get('n').trim();if(!n)return;const id=PR.length?uid():'p0';PR.push({id,name:n});try{localStorage.setItem("kh-profiles",JSON.stringify(PR));localStorage.setItem("kh-cur",id);localStorage.setItem("kh-out","")}catch(x){}location.reload();return}const f=e.target,t=f.dataset.t,v=Object.fromEntries(new FormData(f)),S=SC[t],o=db.find(x=>x.id==f.dataset.id)||(t=='university'&&db.find(x=>x.type==t))||{id:uid(),type:t,at:Date.now(),fav:false},nf={};
