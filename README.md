@@ -1,22 +1,21 @@
-# Knowledge Hub — static website (GitHub Pages) with Google sign-in
+# Knowledge Hub — local-first website
 
-Files: `index.html` (the site), `config.js` (your Supabase keys), `schema.sql` (database).
+Your data is stored **on your own device** (in the browser's database). Nothing is sent to a server and there is no sign-in.
+The website itself can be hosted on GitHub Pages; each browser/device keeps its own private data.
 
-## 1. Put it on GitHub Pages
-1. Create a GitHub repository and upload everything in this folder (files at the top level, including `.nojekyll`).
-2. Repo → **Settings → Pages** → Source: *Deploy from a branch* → Branch: `main`, folder `/ (root)` → Save.
-3. After a minute your site is at `https://YOUR-USER.github.io/YOUR-REPO/`.
+## Put it online (GitHub Pages)
+1. github.com → New repository → upload index.html, config.js, README.md and .nojekyll (files at the top level).
+2. Settings → Pages → Source "Deploy from a branch" → main / (root) → Save.
+3. Open https://YOUR-USER.github.io/YOUR-REPO/
 
-## 2. Database (Supabase)
-1. Create a free project at supabase.com. In **SQL Editor** run `schema.sql`.
-2. **Project Settings → API**: copy *Project URL* and *anon public key* into `config.js`, commit.
+## Keep everything in one place
+Open **Settings → Data**:
+- **Link a data file** (Chrome / Edge): pick a file on your computer; the site keeps it updated automatically.
+- **Export backup**: one file with everything, including Library files. **Import backup** restores it (also on another device).
+Do an export now and then — clearing your browser data erases the local database.
 
-## 3. Google sign-in
-1. Google Cloud Console → **APIs & Services → Credentials → Create credentials → OAuth client ID** (Web application).
-   Authorized redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
-2. Supabase → **Authentication → Providers → Google**: enable and paste Client ID + Secret.
-3. Supabase → **Authentication → URL Configuration**:
-   Site URL = `https://YOUR-USER.github.io/YOUR-REPO/` and add the same URL under *Redirect URLs*.
+## Translator (optional)
+Google Cloud → enable "Cloud Translation API" → Credentials → API key (restrict to your site URL) → paste into config.js (gtKey).
 
-Every person signs in with their own Google account and gets their own private data.
-Without `config.js` filled in, the site still opens and works with local-only profiles.
+## Password manager
+Create a master password the first time. Passwords are encrypted (AES-256) on your device. If you forget the master password they cannot be recovered.
