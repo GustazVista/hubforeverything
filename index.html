@@ -2,9 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Knowledge Hub</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Share+Tech+Mono&family=Noto+Sans+JP:wght@900&family=DM+Serif+Display&family=Space+Mono:wght@400;700&family=Permanent+Marker&family=Inter:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.js"></script>
 <style>
@@ -112,6 +110,8 @@ main{position:relative}
 #sl .drag{transition:none!important;cursor:grabbing;box-shadow:8px 10px 0 rgba(0,0,0,.35);transform:rotate(0)}
 #sl .dh{left:0;top:0;right:26px;height:24px;padding:5px 6px 0 18px;font:9px var(--px);cursor:grab;touch-action:none;opacity:.7;color:var(--ink)}
 #sl .dh:active{cursor:grabbing}
+.dlrow{margin-bottom:4px}.dlrow input[type=checkbox]{width:18px;height:18px;flex:none;margin:4px 0}.dlrow input{margin:4px 0}
+.li input[type=checkbox]{width:16px;height:16px;flex:none;margin:0;accent-color:var(--ac)}code{background:var(--hv);padding:2px 6px}
 </style></head>
 <body><div id="app"><aside><div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>KNOWLEDGE//HUB</span></div><nav id="nav"></nav></aside>
 <main><header><button class="btn ic" data-a="tog" title="Toggle sidebar"><i data-lucide="panel-left"></i></button>
@@ -129,173 +129,151 @@ websites:{l:'Websites & Resources',i:'globe',sl:'Category',s:['Programming','Cyb
 notes:{l:'Notes & Research',i:'notebook-pen',f:[['name','Title','text',1],['notes','Content','textarea']]},
 books:{l:'Books & Reading',i:'library',s:['want to read','reading','completed','paused'],f:[['name','Title','text',1],['author','Author'],['notes','Review & notes','textarea']]}};
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let PR=[],CUR='';try{PR=JSON.parse(localStorage.getItem("kh-profiles")||"[]");CUR=localStorage.getItem("kh-cur")||""}catch(e){}
-const me=PR.find(p=>p.id==CUR),P=me&&me.id!='p0'?me.id+':':'';
-const SB=(window.KH&&KH.url&&KH.key&&window.supabase)?supabase.createClient(KH.url,KH.key):null;
-let CU=null,COL=null,SY='',tm=null;const pushed=new Set();
-let AU={m:'in',e:'',err:'',busy:false};
-const authHTML=()=>{const t=m=>`<button type="button" class="btn ${AU.m==m?'pri':''}" data-a="amode" data-m="${m}" style="flex:1;justify-content:center">${m=='in'?'Sign in':'Register'}</button>`;
-return `<div class="mu">Your data is stored in your own private space — nobody else can see it.</div>${AU.m!='code'?`<div class="row" style="margin:14px 0 4px">${t('in')}${t('up')}</div>`:'<div class="mu" style="margin-top:10px">We sent a verification code to your email.</div>'}
-<form id="af"><label>Email</label><input name="e" type="email" required autocomplete="email" value="${esc(AU.e)}" ${AU.m=='code'?'readonly':''}>
-${AU.m=='code'?`<label>Code from your email</label><input name="c" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required>`:`<label>Password${AU.m=='up'?' (8+ characters)':''}</label><input name="p" type="password" required minlength="${AU.m=='up'?8:1}" autocomplete="${AU.m=='up'?'new-password':'current-password'}">`}
-${AU.err?`<div class="dn" style="margin-top:10px">${esc(AU.err)}</div>`:''}
-<div class="row" style="margin-top:16px;justify-content:flex-end">${AU.m=='code'?`<button type="button" class="btn" data-a="aresend">Resend code</button>`:''}<button class="btn pri" ${AU.busy?'disabled':''}>${AU.busy?'Please wait…':AU.m=='in'?'Sign in':AU.m=='up'?'Send code':'Verify & register'}</button></div></form>`};
-const localHTML=()=>`<div class="mu">Create a profile to keep your data separate. Cloud sign-in is not set up yet (see config.js).</div>${PR.length?`<label>Profiles on this device</label>${PR.map(p=>`<button class="btn" style="width:100%;margin-bottom:6px;justify-content:space-between" data-a="pick" data-id="${p.id}">${esc(p.name)} ${ic('arrow-right')}</button>`).join('')}`:''}<form id="pf"><label>${PR.length?'Or create a new profile':'Your name'}</label><input name="n" required maxlength="40" placeholder="Display name"><div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn pri">Create profile</button></div></form>`;
-function gate(){document.querySelector('[data-gate]')?.remove();document.body.insertAdjacentHTML('beforeend',`<div class="ov" data-gate style="align-items:center;z-index:50;background:var(--bg)"><div class="md"><h1>Welcome to Knowledge Hub</h1>${SB?authHTML():localHTML()}</div></div>`);if(window.lucide)lucide.createIcons();document.querySelector('[data-gate] input')?.focus()}
-async function authSubmit(f){if(AU.busy)return;const v=Object.fromEntries(new FormData(f));AU.e=(v.e||'').trim().toLowerCase();AU.err='';AU.busy=true;gate();
-try{if(AU.m=='in'){const {error}=await SB.auth.signInWithPassword({email:AU.e,password:v.p});if(error)throw error;localStorage.setItem("kh-out","");location.reload();return}
-if(AU.m=='up'){if((v.p||'').length<8)throw new Error('Password must be at least 8 characters.');const {data,error}=await SB.auth.signUp({email:AU.e,password:v.p});if(error)throw error;if(data.user&&data.user.identities&&!data.user.identities.length)throw new Error('This email is already registered — use Sign in.');if(data.session){localStorage.setItem("kh-out","");location.reload();return}AU.m='code'}
-else{const tk=(v.c||'').trim();let r=await SB.auth.verifyOtp({email:AU.e,token:tk,type:'email'});if(r.error)r=await SB.auth.verifyOtp({email:AU.e,token:tk,type:'signup'});if(r.error)throw r.error;localStorage.setItem("kh-out","");location.reload();return}}
-catch(e){AU.err=/invalid login/i.test(e.message)?'Wrong email or password.':(e.message||'Something went wrong.')}
-AU.busy=false;gate()}
-let db=[],view='dashboard',q='',sf='',col=innerWidth<800;
-try{db=JSON.parse(localStorage.getItem(P+'kh')||'[]')}catch(e){}
-db=db.filter(x=>SC[x.type]);
-let st={};try{st=JSON.parse(localStorage.getItem(P+'kh-st')||'{}')}catch(e){}
-const saveSt=()=>{try{localStorage.setItem(P+'kh-st',JSON.stringify(st))}catch(e){}push()};
-let pics={};try{pics=JSON.parse(localStorage.getItem(P+'kh-pic')||'{}')}catch(e){}
-const savePic=()=>{try{localStorage.setItem(P+'kh-pic',JSON.stringify(pics))}catch(e){toast('Browser storage is full — remove some pictures.')}push()};
-const NS=6,NP=6;
-function nslot(a,N){const u=new Set();a.forEach(o=>{if(Number.isInteger(o.s)&&o.s>=0&&!u.has(o.s))u.add(o.s);else o.s=-1});a.forEach(o=>{if(o.s<0){let i=0;while(u.has(i))i++;o.s=i;u.add(i)}});return Math.max(N,...a.map(o=>o.s+1))}
-function slots(a,N,fn,em){const n=nslot(a,N);let h='';for(let i=0;i<n;i++){const o=a.find(x=>x.s==i);h+=`<div class="slot ${o?'':'empty'}" data-slot="${i}">${o?fn(o):em(i)}</div>`}return h}
-function moveTo(k,id,sl){const a=k=='n'?st[view]:pics[view],it=a.find(o=>o.id==id);if(!it||it.s==sl)return;const oc=a.find(o=>o.s==sl&&o.id!=id);if(oc)oc.s=it.s;it.s=sl;k=='n'?saveSt():savePic();render()}
-function board(){const a=pics[view]||(pics[view]=[]);return `<div class="pb ${a.length?'has':''}">${slots(a,NP,p=>`<div class="pol" data-drag="p" draggable="true" data-id="${p.id}"><img src="${p.d}" alt="" draggable="false" data-a="pview" data-i="${p.id}"><button class="x2" data-a="idel" data-i="${p.id}" title="Remove picture">×</button><div class="pa"><button data-a="pmv" data-id="${p.id}" data-d="-1" title="Move left">‹</button><button data-a="pmv" data-id="${p.id}" data-d="1" title="Move right">›</button></div></div>`,i=>`<button class="btn add" data-a="iadd" data-s="${i}">${ic('image')} Add image</button>`)}</div>`}
-const cl=n=>window.claude?window.claude.use(n).catch(()=>null):Promise.resolve(null);
-let lib=[],busy=false,lq='';try{lib=JSON.parse(localStorage.getItem(P+'kh-lib')||'[]')}catch(e){}
-const saveLib=()=>{try{localStorage.setItem(P+'kh-lib',JSON.stringify(lib))}catch(e){}push()};
+
+/* ---------- local database (IndexedDB) ---------- */
+const IDBP=new Promise((ok,no)=>{const r=indexedDB.open('khub',1);r.onupgradeneeded=()=>{r.result.createObjectStore('kv');r.result.createObjectStore('files',{keyPath:'id'})};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const idb=async(store,mode,fn)=>{const d=await IDBP;return new Promise((ok,no)=>{const t=d.transaction(store,mode),rq=fn(t.objectStore(store));t.oncomplete=()=>ok(rq&&rq.result);t.onerror=()=>no(t.error);t.onabort=()=>no(t.error)})};
+let db=[],st={},pics={},vault=null,view='dashboard',q='',sf='',col=innerWidth<800,FL=[],lq='',skin='cyber',FH=null,FHok=false,SAVED='',PEND=null;
+let CFG={status:{},fields:{}},tr={f:'Auto-detect',t:'English',i:'',o:'',b:false,e:''};
+const payload=()=>({v:2,db,st,pics,vault,cfg:CFG,tr:{f:tr.f,t:tr.t},skin});
+let ptm=null;
+function ss(){const e=document.getElementById('sy');if(e)e.textContent=SAVED}
+async function fileWrite(){if(!FH||!FHok)return;try{const w=await FH.createWritable();await w.write(JSON.stringify(payload()));await w.close()}catch(e){FHok=false;toast('Data file is not writable — reconnect it in Settings.')}}
+async function flush(){clearTimeout(ptm);try{await idb('kv','readwrite',s=>s.put(payload(),'data'));SAVED='saved ✓ '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}catch(e){SAVED='save error';toast('Could not save in this browser: '+(e.message||e))}ss();fileWrite()}
+function persist(){SAVED='saving…';ss();clearTimeout(ptm);ptm=setTimeout(flush,350)}
+const save=persist,saveSt=persist,savePic=persist,saveTr=persist;
+function setSkin(k){skin=SK[k]?k:'cyber';document.documentElement.dataset.skin=skin;persist()}
+function apply(d){db=(d.db||[]).filter(x=>SC[x.type]);st=d.st||{};pics=d.pics||{};vault=d.vault||null;CFG=Object.assign({status:{},fields:{}},d.cfg||{});if(d.tr){tr.f=d.tr.f||tr.f;tr.t=d.tr.t||tr.t}skin=SK[d.skin]?d.skin:'cyber';document.documentElement.dataset.skin=skin}
+async function boot(){try{let d=await idb('kv','readonly',s=>s.get('data'));
+if(!d){const g=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};d={db:g('kh')||[],st:g('kh-st')||{},pics:g('kh-pic')||{},tr:g('kh-tr'),skin:localStorage.getItem('kh-skin')}}
+apply(d);FL=(await idb('files','readonly',s=>s.getAll())).map(({blob,...m})=>m);FH=await idb('kv','readonly',s=>s.get('fh'))||null;
+if(FH){try{FHok=(await FH.queryPermission({mode:'readwrite'}))=='granted'}catch(e){FH=null}}}catch(e){toast('Storage problem: '+(e.message||e))}
+SAVED='loaded ✓';render()}
 const fsz=b=>b>1e6?(b/1e6).toFixed(1)+' MB':Math.ceil(b/1e3)+' KB';
-let GD={tok:null,exp:0,fid:null,files:null,busy:false};
-const gdOK=()=>!!(window.KH&&KH.googleClientId);
-function gdAuth(){return new Promise((ok,no)=>{if(GD.tok&&Date.now()<GD.exp-60000)return ok(GD.tok);if(!gdOK())return no(new Error('Add your Google client ID to config.js (googleClientId).'));if(!window.google||!google.accounts)return no(new Error('Google is still loading — try again in a moment.'));
-google.accounts.oauth2.initTokenClient({client_id:KH.googleClientId,scope:'https://www.googleapis.com/auth/drive.file',callback:r=>{if(r.error)return no(new Error('Google Drive access was not granted.'));GD.tok=r.access_token;GD.exp=Date.now()+(+r.expires_in||3600)*1000;ok(GD.tok)},error_callback:()=>no(new Error('The Google sign-in window was closed.'))}).requestAccessToken({})})}
-const gd=async(u,o={})=>{const t=await gdAuth();const r=await fetch(u,{...o,headers:{...(o.headers||{}),Authorization:'Bearer '+t}});if(!r.ok)throw new Error('Google Drive error '+r.status);return r.status==204?null:r.json()};
-async function gdFolder(){if(GD.fid)return GD.fid;const q=encodeURIComponent("name='Knowledge Hub Library' and mimeType='application/vnd.google-apps.folder' and trashed=false");const l=await gd('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)');if(l.files.length)return GD.fid=l.files[0].id;const c=await gd('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Knowledge Hub Library',mimeType:'application/vnd.google-apps.folder'})});return GD.fid=c.id}
-async function gdLoad(){const fid=await gdFolder();const q=encodeURIComponent("'"+fid+"' in parents and trashed=false");const l=await gd('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,mimeType,size,createdTime,webViewLink)&orderBy=createdTime%20desc&pageSize=100');GD.files=l.files}
-async function gdUp(file){const fid=await gdFolder(),b=new FormData();b.append('metadata',new Blob([JSON.stringify({name:file.name,parents:[fid]})],{type:'application/json'}));b.append('file',file);const t=await gdAuth(),r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+t},body:b});if(!r.ok)throw new Error('Upload failed ('+r.status+')')}
-function libv(){if(!gdOK())return `<h1>Library</h1><div class="empty"><div class="e4">SETUP</div><p>Add your Google client ID to config.js to store files in your own Google Drive.</p></div>`;
-if(!GD.files)return `<h1>Library</h1><div class="mu" style="margin:6px 0 16px">Your files are stored in your own Google Drive, in a folder called “Knowledge Hub Library”.</div><button class="btn pri" data-a="gdc">${ic('hard-drive')} ${GD.busy?'Connecting…':'Connect Google Drive'}</button>`;
-const l=GD.files.filter(m=>!lq||m.name.toLowerCase().includes(lq.toLowerCase()));
-return `<div class="row sp" style="margin-bottom:14px;flex-wrap:wrap"><div><h1>Library</h1><div class="mu">${GD.files.length} files · in your Google Drive</div></div><div class="row"><button class="btn" data-a="gdc" title="Refresh">${ic('refresh-cw')}</button><button class="btn pri" data-a="lup">${ic('upload')} ${GD.busy?'Working…':'Upload files'}</button></div></div><div class="row" style="margin-bottom:14px"><input id="lq" placeholder="Filter library…" value="${esc(lq)}"></div>
-${l.length?`<div class="grid">${l.map(m=>`<div class="cd"><b style="word-break:break-all">${esc(m.name)}</b><div class="mu">${esc((m.mimeType||'file').split('/').pop())} · ${fsz(+m.size||0)} · ${new Date(m.createdTime).toLocaleDateString()}</div><div class="row" style="margin-top:auto"><a class="btn" href="${esc(m.webViewLink||'#')}" target="_blank" rel="noopener">${ic('external-link')} Open</a><span style="flex:1"></span><button class="btn ic dg" data-a="ldel" data-id="${esc(m.id)}" title="Delete">${ic('trash-2')}</button></div></div>`).join('')}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${lq?'No files match.':'Your library is empty — upload PDFs, books, documents or images.'}</p></div>`}`}
 const LG=['English','Uzbek','Russian','Japanese','Korean','Chinese','Turkish','Arabic','Spanish','French','German','Italian','Portuguese','Hindi'];
 const GC={English:'en',Uzbek:'uz',Russian:'ru',Japanese:'ja',Korean:'ko',Chinese:'zh-CN',Turkish:'tr',Arabic:'ar',Spanish:'es',French:'fr',German:'de',Italian:'it',Portuguese:'pt',Hindi:'hi'};
 async function gtr(q,f,t){if(!(window.KH&&KH.gtKey))throw new Error('Add your Google Translate API key to config.js (gtKey).');const b={q,target:GC[t],format:'text'};if(f!='Auto-detect')b.source=GC[f];const r=await fetch('https://translation.googleapis.com/language/translate/v2?key='+encodeURIComponent(KH.gtKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error((j.error&&j.error.message)||'Google Translate error '+r.status);return j.data.translations[0].translatedText}
-let tr={f:'Auto-detect',t:'English',i:'',o:'',b:false,e:''};try{const z=JSON.parse(localStorage.getItem(P+'kh-tr')||'{}');if(z.f)tr.f=z.f;if(z.t)tr.t=z.t}catch(e){}
-const saveTr=()=>{try{localStorage.setItem(P+'kh-tr',JSON.stringify({f:tr.f,t:tr.t}))}catch(e){}push()};
-function trv(){const op=v=>LG.map(l=>`<option ${v==l?'selected':''}>${l}</option>`).join('');
-return `<h1>Translator</h1><div class="mu" style="margin-bottom:14px">Powered by Google Translate</div><div class="row" style="margin-bottom:10px;flex-wrap:wrap"><select id="tf" style="max-width:190px"><option ${tr.f=='Auto-detect'?'selected':''}>Auto-detect</option>${op(tr.f)}</select><button class="btn ic" data-a="tswap" title="Swap languages">${ic('arrow-left-right')}</button><select id="tt" style="max-width:190px">${op(tr.t)}</select><button class="btn pri" data-a="tgo">${tr.b?'LOADING…':'Translate'}</button></div>
-<div class="two"><textarea id="ti" rows="9" placeholder="Type or paste text…">${esc(tr.i)}</textarea><textarea id="to" rows="9" readonly placeholder="Translation">${esc(tr.o)}</textarea></div>
-<div class="row" style="margin-top:10px"><button class="btn" data-a="tcopy">${ic('copy')} Copy translation</button><span class="dn">${esc(tr.e)}</span></div>`}
 const SK={cyber:{n:'Cyber HUD',d:'Neon cyan terminal',c:['#020306','#050c14','#2eb6ff','#2ed3c9','#e8f6ff'],h:['新たな始まり!','I WILL CONTINUE']},
 forest:{n:'Light',d:'Misty forest poster',c:['#eef3e2','#f8faf0','#3f7d20','#8fb35a','#1c3318'],h:['Light','Find your glow']},
 halftone:{n:'Halftone',d:'Black & white static',c:['#050505','#1a1a1a','#ffffff','#bdbdbd','#f5f5f5'],h:['Static','Signal in the noise']},
 graffiti:{n:'Graffiti',d:'Spray-paint street art',c:['#120a09','#2b1812','#ff3b1f','#7bd62f','#fff7e0'],h:['Keep going','Tag it. Build it.']},
 minimal:{n:'Blank',d:'Clean white minimal',c:['#ffffff','#f4f4f5','#111111','#52525b','#111111'],h:['Knowledge Hub','Everything in one place']}};
-let skin='cyber';try{skin=localStorage.getItem(P+'kh-skin')||'cyber'}catch(e){}
-const setSkin=k=>{skin=SK[k]?k:'cyber';document.documentElement.dataset.skin=skin;try{localStorage.setItem(P+'kh-skin',skin)}catch(e){}push()};setSkin(skin);
 const designs=()=>`<div class="cd"><h2>DESIGNS</h2><div class="mu">Choose a look for the whole site.</div><div class="grid">${Object.entries(SK).map(([k,v])=>`<div class="sw ${skin==k?'on':''}" data-a="skin" data-k="${k}" style="background:${v.c[0]}"><div class="row">${v.c.slice(1,4).map(c=>`<i style="background:${c}"></i>`).join('')}</div><b style="color:${v.c[4]}">${v.n}</b><span style="color:${v.c[4]};opacity:.7">${v.d}</span></div>`).join('')}</div></div><br>`;
 function toast(m){let t=document.getElementById('tt');if(!t){t=document.createElement('div');t.id='tt';t.className='tt';document.body.appendChild(t)}t.textContent=m;t.style.opacity=1;clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,3200)}
-function ss(){const e=document.getElementById('sy');if(e)e.textContent=SY}
-function push(){if(!COL)return;SY='saving…';ss();clearTimeout(tm);tm=setTimeout(doPush,700)}
-async function doPush(){try{await COL.doc('items').set({j:JSON.stringify(db)});const all=new Set();for(const v in pics)for(const p of pics[v]){all.add(p.id);if(!pushed.has(p.id)){await COL.doc('pic_'+p.id).set({j:p.d});pushed.add(p.id)}}
-for(const id of [...pushed])if(!all.has(id)){await COL.doc('pic_'+id).delete();pushed.delete(id)}
-const pi={};for(const v in pics)pi[v]=pics[v].map(p=>p.id);await COL.doc('meta').set({j:JSON.stringify({st,lib,skin,tr:{f:tr.f,t:tr.t},pi})});SY='synced ✓'}catch(e){SY='sync error';toast('Cloud sync failed — your data is still saved on this device.')}ss()}
-async function sync(){if(!SB)return;const c=ADAPT(CU.id);SY='syncing…';
-try{const [a,b]=await Promise.all([c.doc('items').get(),c.doc('meta').get()]);
-if(a.exists){db=JSON.parse(a.data().j).filter(x=>SC[x.type]);try{localStorage.setItem(P+'kh',JSON.stringify(db))}catch(e){}
-if(b.exists){const m=JSON.parse(b.data().j);st=m.st||{};lib=m.lib||[];if(m.tr){tr.f=m.tr.f||tr.f;tr.t=m.tr.t||tr.t}pics={};
-for(const v in m.pi||{})pics[v]=(await Promise.all(m.pi[v].map(async id=>{const z=await c.doc('pic_'+id).get();pushed.add(id);return z.exists?{id,d:z.data().j}:null}))).filter(Boolean);
-try{localStorage.setItem(P+'kh-st',JSON.stringify(st));localStorage.setItem(P+'kh-lib',JSON.stringify(lib));localStorage.setItem(P+'kh-pic',JSON.stringify(pics))}catch(e){}
-if(m.skin)setSkin(m.skin)}}
-COL=c;if(!a.exists)doPush();else SY='synced ✓';render()}catch(e){COL=null;SY='offline';render()}}
-function adoptCloud(){const pid='cloud:'+CU.id,np=pid+':';if(!PR.find(p=>p.id==pid)){if(!PR.length||(me&&!me.cloud))['kh','kh-st','kh-pic','kh-lib','kh-tr','kh-skin'].forEach(k=>{const v=localStorage.getItem(P+k);if(v!=null)localStorage.setItem(np+k,v)});PR.push({id:pid,name:CU.name,cloud:true})}
-try{localStorage.setItem("kh-profiles",JSON.stringify(PR));localStorage.setItem("kh-cur",pid);localStorage.setItem("kh-out","")}catch(e){}location.reload()}
-const ADAPT=uid=>({doc:id=>({
-get:async()=>{const {data,error}=await SB.from('kh_docs').select('j').eq('id',id).maybeSingle();if(error)throw error;return {exists:!!data,data:()=>data?{j:data.j}:undefined}},
-set:async o=>{const {error}=await SB.from('kh_docs').upsert({user_id:uid,id,j:o.j},{onConflict:'user_id,id'});if(error)throw error},
-delete:async()=>{const {error}=await SB.from('kh_docs').delete().eq('id',id);if(error)throw error}})});
-async function cloudInit(){try{if(!SB)return;const {data:{session}}=await SB.auth.getSession();
-if(!session){if(me&&me.cloud){localStorage.setItem("kh-cur","");location.reload()}return}
-const u=session.user,md=u.user_metadata||{};CU={id:u.id,name:md.full_name||md.name||u.email||'User'};
-if(me&&me.cloud&&me.id=='cloud:'+CU.id){await sync();return}
-if(me&&me.cloud){adoptCloud();return}
-if(!me&&!localStorage.getItem("kh-out")){adoptCloud();return}
-if(me)render()}catch(e){}}
-function stickies(){if(!st[view]){st[view]=[{id:uid(),t:'',r:-1.5,s:0}];saveSt()}
-return `<div class="sk">${slots(st[view],NS,n=>`<div class="note" style="--r:${n.r}deg"><span class="dh" data-drag="n" draggable="true" data-id="${n.id}" title="Drag to another spot">⠿</span><button class="x" data-a="sdel" data-id="${n.id}" title="Remove note">×</button><textarea data-sid="${n.id}" placeholder="Sticky note — jot something down…">${esc(n.t)}</textarea>
-${(n.l||[]).map(i=>`<div class="ck"><input type="checkbox" data-cid="${n.id}" data-iid="${i.id}" ${i.d?'checked':''}><input class="ct ${i.d?'d2':''}" data-nid="${n.id}" data-iid="${i.id}" value="${esc(i.t)}" placeholder="List item"><button class="x2" data-a="cdel" data-id="${n.id}" data-i="${i.id}" title="Remove item">×</button></div>`).join('')}
-<div class="nb"><button data-a="cadd" data-id="${n.id}">☐ LIST</button><button data-a="smv" data-id="${n.id}" data-d="-1" title="Move left">◀</button><button data-a="smv" data-id="${n.id}" data-d="1" title="Move right">▶</button></div></div>`,i=>`<button class="note add" data-a="sadd" data-s="${i}">+ NOTE</button>`)}</div>`}
-const save=()=>{try{localStorage.setItem(P+'kh',JSON.stringify(db))}catch(e){}push()};
-const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
-const days=d=>Math.ceil((new Date(d+'T00:00')-new Date().setHours(0,0,0,0))/864e5);
-const ic=(n)=>`<i data-lucide="${n}"></i>`;
-const link=x=>{const f=SC[x.type].f.find(f=>f[2]=='url'&&x.f[f[0]]);return f?x.f[f[0]]:''};
-const norm=u=>/^https?:\/\//i.test(u)?u:'https://'+u;
-const hit=(x,t)=>!t||(JSON.stringify(x.f)+x.tags.join(' ')+x.status+x.type).toLowerCase().includes(t.toLowerCase());
-const dls=()=>db.flatMap(x=>{const d=SC[x.type].dl&&x.f[SC[x.type].dl];return d?[{x,d}]:[]}).sort((a,b)=>a.d<b.d?-1:1);
-function when(d){const n=days(d);return `<span class="${n<0?'dn':n<=7?'wr':'mu'}">${n<0?Math.abs(n)+'d overdue':n==0?'today':n+'d left'}</span>`}
-function card(x){const S=SC[x.type],sub=S.f.filter(f=>!f[2]&&f[0]!='notes').map(f=>x.f[f[0]]).filter(Boolean).slice(0,2).join(' · '),u=link(x),d=S.dl&&x.f[S.dl];
-return `<div class="cd"><div class="row sp"><b>${esc(x.f.name)}</b><button class="btn ic ${x.fav?'ff':''}" data-a="fav" data-id="${x.id}" title="Favorite" style="border-color:transparent">${ic(x.fav?'star':'star')}</button></div>
-${sub?`<div class="mu">${esc(sub)}</div>`:''}
-<div class="row" style="flex-wrap:wrap">${x.status?`<span class="bg">${esc(x.status)}</span>`:''}${d?`<span class="mu">${esc(d)} · </span>${when(d)}`:''}</div>
-${S.p?`<div class="bar"><i style="width:${x.p||0}%"></i></div><div class="mu">${x.p||0}% complete</div>`:''}
-${x.f.notes?`<div class="mu" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(x.f.notes)}</div>`:''}
-${x.tags.length?`<div class="tg">${x.tags.map(t=>'#'+esc(t)).join(' ')}</div>`:''}
-<div class="row" style="margin-top:auto">${u?`<a class="btn" href="${esc(norm(u))}" target="_blank" rel="noopener" data-a="vis" data-id="${x.id}">${ic('external-link')} Open</a>`:''}<span style="flex:1"></span><button class="btn ic" data-a="edit" data-id="${x.id}" title="Edit">${ic('pencil')}</button><button class="btn ic dg" data-a="del" data-id="${x.id}" title="Delete">${ic('trash-2')}</button></div></div>`}
-function listView(t){const S=SC[t];let it=db.filter(x=>x.type==t&&hit(x,q)&&(!sf||x.status==sf)).sort((a,b)=>b.at-a.at);
-return `<div class="row sp" style="margin-bottom:14px;flex-wrap:wrap"><div><h1>${S.l}</h1><div class="mu">${db.filter(x=>x.type==t).length} saved</div></div><button class="btn pri" data-a="add" data-t="${t}">${ic('plus')} Add</button></div>
-<div class="row" style="margin-bottom:14px"><input id="fq" placeholder="Filter ${S.l.toLowerCase()}…" value="${esc(q)}">${S.s?`<select id="fs" style="max-width:200px"><option value="">All ${(S.sl||'statuses').toLowerCase()}</option>${S.s.map(s=>`<option ${sf==s?'selected':''}>${s}</option>`).join('')}</select>`:''}</div>
-${it.length?`<div class="grid">${it.map(card).join('')}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${q||sf?'Nothing matches your filters.':'Nothing saved here yet.'}</p></div>`}`}
-function dash(){const n=t=>db.filter(x=>x.type==t).length,up=dls().filter(o=>days(o.d)>=-3).slice(0,6),rec=[...db].sort((a,b)=>b.at-a.at).slice(0,6),fav=db.filter(x=>x.fav).slice(0,5),act=db.filter(x=>SC[x.type].p&&x.status=='in progress'),u=db.find(x=>x.type=='university');
-const li=(x,r='')=>`<div class="li" data-a="edit" data-id="${x.id}"><span class="row">${ic(SC[x.type].i)}${esc(x.f.name)}</span>${r}</div>`;
-return `<div class="mu" style="margin-bottom:4px">Welcome back, ${esc(me?me.name:'')}</div><div class="hero"><div class="jp">${SK[skin].h[0]}</div><div class="sub">${SK[skin].h[1]}</div></div><div class="hz"></div>
-<div class="grid st">${['courses','projects','websites','notes','books'].map(t=>`<div class="cd stc" data-go="${t}"><span>${SC[t].l}</span><b>${n(t)}</b></div>`).join('')}</div>
-<div class="two"><div class="cd"><h2>MY_UNIVERSITY</h2>${u?`<b>${esc(u.f.name)}</b><div class="mu">${esc([u.f.platform,u.f.major].filter(Boolean).join(' · ')||'Add your platform in the profile')}</div><div class="row">${u.f.platformUrl?`<a class="btn pri" href="${esc(norm(u.f.platformUrl))}" target="_blank" rel="noopener">${ic('external-link')} Open platform</a>`:''}<button class="btn" data-go="university">Profile</button></div>`:`<span class="mu">No university profile yet.</span><div><button class="btn pri" data-a="add" data-t="university">Set up</button></div>`}</div>
-<div class="cd"><h2>UPCOMING_DEADLINES</h2>${up.map(o=>li(o.x,`<span class="mu">${o.d} · </span>${when(o.d)}`)).join('')||'<span class="mu">No dated entries yet.</span>'}</div>
-<div class="cd"><h2>RECENTLY_ADDED</h2>${rec.map(x=>li(x)).join('')||'<span class="mu">Use Quick add to create your first entry.</span>'}</div>
-<div class="cd"><h2>IN_PROGRESS</h2>${act.map(x=>`<div class="li" data-a="edit" data-id="${x.id}"><span>${esc(x.f.name)}</span><span class="mu">LOADING… ${x.p||0}%</span></div>`).join('')||'<span class="mu">No active courses or projects.</span>'}</div>
-<div class="cd"><h2>FAVORITES</h2>${fav.map(x=>li(x)).join('')||'<span class="mu">Star entries to pin them here.</span>'}</div></div>`}
-function uni(){const x=db.find(o=>o.type=='university');
-if(!x)return `<h1>My University</h1><div class="empty"><div class="e4">ERROR 404</div><p>No university profile yet.</p><button class="btn pri" data-a="add" data-t="university">${ic('plus')} Set up</button></div>`;
-const L=(u,t)=>u?`<a class="btn ${t[0]}" href="${esc(norm(u))}" target="_blank" rel="noopener">${ic('external-link')} ${t[1]}</a>`:'';
-return `<div class="row sp" style="margin-bottom:16px;flex-wrap:wrap"><h1>${esc(x.f.name)}</h1><div class="row" style="flex-wrap:wrap">${L(x.f.platformUrl,['pri','Open '+esc(x.f.platform||'platform')])}${L(x.f.portal,['','Student portal'])}<button class="btn" data-a="edit" data-id="${x.id}">${ic('pencil')} Edit</button></div></div>
-<div class="cd"><h2>UNIVERSITY.PROFILE</h2><div class="kv">${SC.university.f.filter(f=>!['name','notes','platformUrl','portal'].includes(f[0])&&x.f[f[0]]).map(f=>`<div><span class="mu">${f[1]}</span><br><b>${esc(x.f[f[0]])}</b></div>`).join('')}</div>${x.f.notes?`<div class="mu" style="margin-top:12px">NOTES</div><div style="white-space:pre-wrap">${esc(x.f.notes)}</div>`:''}</div>${subj(x)}`}
 const subj=x=>{const sj=x.subjects||[],cr=sj.reduce((a,j)=>a+(+j.c||0),0);return `<div class="cd" style="margin-top:16px"><h2>SUBJECTS</h2><div class="row sp"><span class="mu">${sj.length} subjects${cr?' · '+cr+' credits':''}</span><button class="btn pri" data-a="sjadd">${ic('plus')} Add subject</button></div>${sj.map(j=>`<div class="li" data-a="sjedit" data-id="${j.id}"><span><b>${esc(j.n)}</b> <span class="mu">${esc([j.t,j.c?j.c+' credits':''].filter(Boolean).join(' · '))}</span></span><span class="row">${j.g?`<span class="bg">${esc(j.g)}</span>`:''}<button class="btn ic dg" data-a="sjdel" data-id="${j.id}" title="Delete subject">${ic('trash-2')}</button></span></div>`).join('')||'<span class="mu">No subjects yet — add the subjects you study.</span>'}</div>`};
 function sjform(id){const u=db.find(x=>x.type=='university'),j=(u.subjects||[]).find(o=>o.id==id)||{};modal(`<form id="sf" data-id="${id||''}"><h1>${id?'Edit':'Add'} subject</h1><label>Subject name *</label><input name="n" required value="${esc(j.n)}"><label>Teacher</label><input name="t" value="${esc(j.t)}"><label>Credits</label><input name="c" value="${esc(j.c)}"><label>Grade / score</label><input name="g" value="${esc(j.g)}"><div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">Save</button></div></form>`)}
 function subjSave(f){const u=db.find(x=>x.type=='university');if(!u)return;const v=Object.fromEntries(new FormData(f)),l=u.subjects=u.subjects||[],ex=l.find(j=>j.id==f.dataset.id),o=ex||{id:uid()};['n','t','c','g'].forEach(k=>o[k]=(v[k]||'').trim());if(!ex)l.push(o);save();modal('');render()}
-function cal(){const l=dls();return `<h1>Calendar & Deadlines</h1><div class="mu" style="margin-bottom:14px">All dated entries, soonest first</div><div class="cd">${l.map(o=>`<div class="li" data-a="edit" data-id="${o.x.id}"><span class="row">${ic(SC[o.x.type].i)}${esc(o.x.f.name)}<span class="bg">${SC[o.x.type].l}</span></span><span>${o.d} · ${when(o.d)}</span></div>`).join('')||'<span class="mu">Add a deadline or date to any entry and it appears here.</span>'}</div>`}
+
+const days=d=>Math.ceil((new Date(d+'T00:00')-new Date().setHours(0,0,0,0))/864e5);
+const ic=n=>`<i data-lucide="${n}"></i>`;
+const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
+const norm=u=>/^https?:\/\//i.test(u)?u:'https://'+u;
+const link=x=>{const f=SC[x.type].f.find(f=>f[2]=='url'&&x.f[f[0]]);return f?x.f[f[0]]:''};
+const eff=t=>CFG.status[t]||SC[t].s||[];
+const hit=(x,t)=>!t||(JSON.stringify(x.f)+JSON.stringify(x.c||{})+(x.tags||[]).join(' ')+x.status+x.type+(x.dl||[]).map(d=>d.t).join(' ')).toLowerCase().includes(t.toLowerCase());
+function when(d){const n=days(d);return `<span class="${n<0?'dn':n<=7?'wr':'mu'}">${n<0?Math.abs(n)+'d overdue':n==0?'today':n+'d left'}</span>`}
+const dls=()=>db.flatMap(x=>{const S=SC[x.type],o=(x.dl||[]).map(d=>({x,k:d.id,t:d.t||'Deadline',d:d.d,done:!!d.done})),lf=S.dl&&S.f.find(f=>f[0]==S.dl);if(lf&&x.f[S.dl])o.push({x,k:'f',t:lf[1],d:x.f[S.dl],done:x.status=='completed'});return o}).filter(o=>o.d).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+const dlrow=d=>`<div class="dlrow row" data-id="${esc(d.id||'')}"><input type="checkbox" class="dcb" title="Done" ${d.done?'checked':''}><input name="dt" placeholder="Deadline title" value="${esc(d.t||'')}"><input name="dd" type="date" value="${esc(d.d||'')}"><button type="button" class="btn ic dg" data-a="dlrm" title="Remove">${ic('x')}</button></div>`;
+const dlist=o=>`<div class="li"><span class="row"><input type="checkbox" data-dd="${o.x.id}" data-k="${o.k}" ${o.done?'checked':''} ${o.k=='f'?'disabled':''}><span data-a="edit" data-id="${o.x.id}" style="cursor:pointer;${o.done?'text-decoration:line-through;opacity:.55':''}">${esc(o.x.f.name)} <span class="mu">· ${esc(o.t)}</span></span></span><span>${o.d} · ${o.done?'<span class="mu">done</span>':when(o.d)}</span></div>`;
+function card(x){const S=SC[x.type],sub=S.f.filter(f=>!f[2]&&f[0]!='notes').map(f=>x.f[f[0]]).filter(Boolean).slice(0,2).join(' · '),u=link(x),nd=dls().find(o=>o.x===x&&!o.done),
+cf=(CFG.fields[x.type]||[]).filter(f=>x.c&&x.c[f.id]!==undefined&&x.c[f.id]!==''&&x.c[f.id]!==false).map(f=>`<div class="mu">${esc(f.l)}: ${f.t=='checkbox'?'✓':esc(x.c[f.id])}</div>`).join('');
+return `<div class="cd"><div class="row sp"><b>${esc(x.f.name)}</b><button class="btn ic ${x.fav?'ff':''}" data-a="fav" data-id="${x.id}" title="Favorite" style="border-color:transparent">${ic('star')}</button></div>
+${sub?`<div class="mu">${esc(sub)}</div>`:''}${x.status?`<div><span class="bg">${esc(x.status)}</span></div>`:''}
+${nd?`<div class="row" style="flex-wrap:wrap">${ic('alarm-clock')}<span class="mu">${esc(nd.t)} · ${nd.d} ·</span>${when(nd.d)}</div>`:''}
+${S.p?`<div class="bar"><i style="width:${x.p||0}%"></i></div><div class="mu">${x.p||0}% complete</div>`:''}${cf}
+${x.f.notes?`<div class="mu" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(x.f.notes)}</div>`:''}
+${(x.tags||[]).length?`<div class="tg">${x.tags.map(t=>'#'+esc(t)).join(' ')}</div>`:''}
+<div class="row" style="margin-top:auto">${u?`<a class="btn" href="${esc(norm(u))}" target="_blank" rel="noopener">${ic('external-link')} Open</a>`:''}<span style="flex:1"></span><button class="btn ic" data-a="edit" data-id="${x.id}" title="Edit">${ic('pencil')}</button><button class="btn ic dg" data-a="del" data-id="${x.id}" title="Delete">${ic('trash-2')}</button></div></div>`}
+function listView(t){const S=SC[t],stl=eff(t),it=db.filter(x=>x.type==t&&hit(x,q)&&(!sf||x.status==sf)).sort((a,b)=>b.at-a.at);
+return `<div class="row sp" style="margin-bottom:14px;flex-wrap:wrap"><div><h1>${S.l}</h1><div class="mu">${db.filter(x=>x.type==t).length} saved</div></div><button class="btn pri" data-a="add" data-t="${t}">${ic('plus')} Add</button></div>
+<div class="row" style="margin-bottom:14px"><input id="fq" placeholder="Filter ${S.l.toLowerCase()}…" value="${esc(q)}">${stl.length?`<select id="fs" style="max-width:200px"><option value="">All ${(S.sl||'statuses').toLowerCase()}</option>${stl.map(s=>`<option ${sf==s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}</div>
+${it.length?`<div class="grid">${it.map(card).join('')}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${q||sf?'Nothing matches your filters.':'Nothing saved here yet.'}</p></div>`}`}
+function dash(){const n=t=>db.filter(x=>x.type==t).length,all=dls().filter(o=>!o.done),up=all.filter(o=>days(o.d)>=-7).slice(0,8),rec=[...db].sort((a,b)=>b.at-a.at).slice(0,6),fav=db.filter(x=>x.fav).slice(0,5),act=db.filter(x=>SC[x.type].p&&x.status=='in progress'),u=db.find(x=>x.type=='university');
+const li=x=>`<div class="li" data-a="edit" data-id="${x.id}"><span class="row">${ic(SC[x.type].i)}${esc(x.f.name)}</span></div>`;
+return `<div class="mu" style="margin-bottom:4px">${new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}</div><div class="hero"><div class="jp">${SK[skin].h[0]}</div><div class="sub">${SK[skin].h[1]}</div></div><div class="hz"></div>
+<div class="grid st">${['courses','projects','websites','notes','books'].map(t=>`<div class="cd stc" data-go="${t}"><span>${SC[t].l}</span><b>${n(t)}</b></div>`).join('')}<div class="cd stc" data-go="calendar"><span>Open deadlines</span><b>${all.length}</b></div></div>
+<div class="two"><div class="cd"><h2>UPCOMING_DEADLINES</h2>${up.map(dlist).join('')||'<span class="mu">No open deadlines — add them inside any entry.</span>'}</div>
+<div class="cd"><h2>MY_UNIVERSITY</h2>${u?`<b>${esc(u.f.name)}</b><div class="mu">${esc([u.f.platform,u.f.major].filter(Boolean).join(' · ')||'Add your platform in the profile')}</div><div class="row">${u.f.platformUrl?`<a class="btn pri" href="${esc(norm(u.f.platformUrl))}" target="_blank" rel="noopener">${ic('external-link')} Open platform</a>`:''}<button class="btn" data-go="university">Profile</button></div>`:`<span class="mu">No university profile yet.</span><div><button class="btn pri" data-a="add" data-t="university">Set up</button></div>`}</div>
+<div class="cd"><h2>RECENTLY_ADDED</h2>${rec.map(li).join('')||'<span class="mu">Use Quick add to create your first entry.</span>'}</div>
+<div class="cd"><h2>IN_PROGRESS</h2>${act.map(x=>`<div class="li" data-a="edit" data-id="${x.id}"><span>${esc(x.f.name)}</span><span class="mu">LOADING… ${x.p||0}%</span></div>`).join('')||'<span class="mu">No active courses or projects.</span>'}</div>
+<div class="cd"><h2>FAVORITES</h2>${fav.map(li).join('')||'<span class="mu">Star entries to pin them here.</span>'}</div></div>`}
+function uni(){const x=db.find(o=>o.type=='university');
+if(!x)return `<h1>My University</h1><div class="empty"><div class="e4">ERROR 404</div><p>No university profile yet.</p><button class="btn pri" data-a="add" data-t="university">${ic('plus')} Set up</button></div>`;
+const B=(u,c,t)=>u?`<a class="btn ${c}" href="${esc(norm(u))}" target="_blank" rel="noopener">${ic('external-link')} ${t}</a>`:'',cf=(CFG.fields.university||[]).filter(f=>x.c&&x.c[f.id]).map(f=>[f.l,f.t=='checkbox'?'✓':x.c[f.id]]),d=dls().filter(o=>o.x===x);
+return `<div class="row sp" style="margin-bottom:16px;flex-wrap:wrap"><h1>${esc(x.f.name)}</h1><div class="row" style="flex-wrap:wrap">${B(x.f.platformUrl,'pri','Open '+esc(x.f.platform||'platform'))}${B(x.f.portal,'','Student portal')}<button class="btn" data-a="edit" data-id="${x.id}">${ic('pencil')} Edit</button></div></div>
+<div class="cd"><h2>UNIVERSITY.PROFILE</h2><div class="kv">${SC.university.f.filter(f=>!['name','notes','platformUrl','portal'].includes(f[0])&&x.f[f[0]]).map(f=>[f[1],x.f[f[0]]]).concat(cf).map(([a,b])=>`<div><span class="mu">${esc(a)}</span><br><b>${esc(b)}</b></div>`).join('')}</div>${x.f.notes?`<div class="mu" style="margin-top:12px">NOTES</div><div style="white-space:pre-wrap">${esc(x.f.notes)}</div>`:''}</div>
+<div class="cd" style="margin-top:16px"><h2>DEADLINES</h2>${d.map(dlist).join('')||'<span class="mu">No deadlines — press Edit to add some.</span>'}</div>${subj(x)}`}
+function cal(){const l=dls();return `<h1>Calendar & Deadlines</h1><div class="mu" style="margin-bottom:14px">Every deadline from every category, soonest first. Tick one to mark it done.</div><div class="cd">${l.map(o=>`${dlist(o)}`).join('')||'<span class="mu">Open any entry → Edit → “Add deadline”, and it will show up here and on the dashboard.</span>'}</div>`}
+const cfgCard=(t,S)=>`<div style="border-top:1px dashed var(--bd);padding:10px 0"><b>${esc(S.l)}</b><label>${S.sl||'Status'} options (comma separated${eff(t).length?'':' — empty = none'})</label><input data-cs="${t}" value="${esc(eff(t).join(', '))}" placeholder="e.g. todo, doing, done"><label>Custom fields</label>${(CFG.fields[t]||[]).map(f=>`<div class="li"><span>${esc(f.l)} <span class="mu">· ${f.t}${f.t=='select'?' ('+esc((f.o||[]).join(', '))+')':''}</span></span><button class="btn ic dg" data-a="cfdel" data-t="${t}" data-id="${f.id}" title="Remove field">${ic('trash-2')}</button></div>`).join('')||'<div class="mu">None yet.</div>'}
+<div class="row" style="margin-top:8px;flex-wrap:wrap"><input id="cn-${t}" placeholder="Field name" style="flex:2;min-width:130px"><select id="ct-${t}" style="flex:1;min-width:110px"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="url">Link</option><option value="checkbox">Checkbox</option><option value="select">Dropdown</option></select><input id="co-${t}" placeholder="Dropdown options, comma separated" style="flex:2;min-width:130px"><button class="btn pri" data-a="cfadd" data-t="${t}">Add</button></div></div>`;
+function sets(){const can=!!window.showSaveFilePicker;return `<h1>Settings</h1><br>${designs()}
+<div class="cd"><h2>DATA — EVERYTHING IN ONE PLACE</h2><div class="mu">All your data stays on this device, in your browser's database — nothing is sent to a server. Link a file to keep a live copy on your computer, and export a full backup (including Library files) whenever you like.</div>
+<div class="row" style="flex-wrap:wrap">${can?`<button class="btn" data-a="flink">${ic('link')} ${FH?'Change data file':'Link a data file'}</button>`:''}${FH&&!FHok?`<button class="btn pri" data-a="freconn">Reconnect data file</button>`:''}${FH?`<button class="btn" data-a="fload">${ic('download')} Load from linked file</button>`:''}<button class="btn" data-a="bexp">${ic('download')} Export backup</button><button class="btn" data-a="bimp">${ic('upload')} Import backup</button></div>
+<div class="mu">${FH?'Linked file: '+esc(FH.name)+(FHok?' — auto-saving':' — needs permission'):(can?'No data file linked yet.':'This browser cannot link a file — use Export / Import.')}</div></div><br>
+<div class="cd"><h2>CUSTOMIZE CATEGORIES</h2><div class="mu">Add your own fields and status options to any category. Every category form also has a Deadlines list.</div>${Object.entries(SC).map(([t,S])=>cfgCard(t,S)).join('')}</div><br>
+<div class="cd"><h2>DANGER ZONE</h2><div><button class="btn dg" data-a="clr">${ic('trash-2')} Delete all data</button></div></div>`}
+function trv(){const op=v=>LG.map(l=>`<option ${v==l?'selected':''}>${l}</option>`).join('');
+return `<h1>Translator</h1><div class="mu" style="margin-bottom:14px">Powered by Google Translate</div><div class="row" style="margin-bottom:10px;flex-wrap:wrap"><select id="tf" style="max-width:190px"><option ${tr.f=='Auto-detect'?'selected':''}>Auto-detect</option>${op(tr.f)}</select><button class="btn ic" data-a="tswap" title="Swap languages">${ic('arrow-left-right')}</button><select id="tt" style="max-width:190px">${op(tr.t)}</select><button class="btn pri" data-a="tgo">${tr.b?'LOADING…':'Translate'}</button></div>
+<div class="two"><textarea id="ti" rows="9" placeholder="Type or paste text…">${esc(tr.i)}</textarea><textarea id="to" rows="9" readonly placeholder="Translation">${esc(tr.o)}</textarea></div>
+<div class="row" style="margin-top:10px"><button class="btn" data-a="tcopy">${ic('copy')} Copy translation</button><span class="dn">${esc(tr.e)}</span></div>`}
 function favs(){const f=db.filter(x=>x.fav);return `<h1>Favorites</h1><br>${f.length?`<div class="grid">${f.map(card).join('')}</div>`:'<div class="empty">Star an entry to see it here.</div>'}`}
-function sets(){return `<h1>Settings</h1><br>${designs()}<div class="cd"><h2>Export / import</h2><div class="mu">Data is stored in this browser. Copy the JSON as a backup, or paste a backup to restore.</div><textarea id="ex" rows="6" placeholder="Backup JSON">${esc(JSON.stringify(db))}</textarea><div class="row"><button class="btn" data-a="imp">${ic('upload')} Import pasted JSON</button><button class="btn dg" data-a="clr">${ic('trash-2')} Delete all data</button></div></div>`}
-function render(){const g=(h,a)=>`<div class="gh">${h}</div>`+a.map(([k,l,i,n])=>`<button class="nv ${view==k?'on':''}" data-go="${k}" title="${l}">${ic(i)}<span class="lb">${l}</span>${n?`<em class="lb">${n}</em>`:''}</button>`).join('');
-$('#app').className=col?'c':'';
-$('#nav').innerHTML=g('Main',[['dashboard','Dashboard','layout-dashboard'],['favorites','Favorites','star',db.filter(x=>x.fav).length||''],['calendar','Calendar & Deadlines','calendar']])+g('Knowledge',Object.entries(SC).map(([k,s])=>[k,s.l,s.i,db.filter(x=>x.type==k).length||'']))+g('Tools',[['library','Library','archive',(GD.files||[]).length||''],['translate','Translator','languages']])+g('System',[['settings','Settings','settings']])+`<div class="gh">Profile</div><button class="nv" data-a="signout" title="Switch profile">${ic('user')}<span class="lb">${esc(me?me.name:'')} · switch</span><em class="lb" id="sy">${me&&me.cloud?SY:''}</em></button>${CU&&me&&!me.cloud?`<button class="nv" data-a="cloud" title="Sync across devices">${ic('cloud')}<span class="lb">Enable cloud sync</span></button>`:''}`;
-$('#body').innerHTML=(view=='university'?uni():SC[view]?listView(view):({dashboard:dash,favorites:favs,calendar:cal,settings:sets,library:libv,translate:trv})[view]());
-const SL=$('#sl');SL.style.top=document.querySelector('header').offsetHeight+'px';SL.innerHTML=layerHTML();document.querySelectorAll('.sbtn').forEach(b=>b.style.display=view=='dashboard'?'none':'');
-if(window.lucide)lucide.createIcons()}
 function modal(h){$('#mo').innerHTML=h?`<div class="ov" data-a="x"><div class="md">${h}</div></div>`:'';if(window.lucide)lucide.createIcons()}
-function form(t,id){const S=SC[t],x=db.find(o=>o.id==id)||(t=='university'&&db.find(o=>o.type==t))||{f:{},tags:[],status:S.s?S.s[0]:'',p:0};
-modal(`<form id="fm" data-t="${t}" data-id="${id||''}"><h1>${id?'Edit':'Add'} ${S.l.replace(/s$/,'')}</h1>${S.f.map(([k,l,ty,r])=>`<label>${l}${r?' *':''}</label>${ty=='textarea'?`<textarea name="${k}" rows="4">${esc(x.f[k])}</textarea>`:`<input name="${k}" type="${ty=='date'?'date':'text'}" ${r?'required':''} value="${esc(x.f[k])}">`}`).join('')}
-${S.s?`<label>${S.sl||'Status'}</label><select name="_s">${S.s.map(s=>`<option ${x.status==s?'selected':''}>${s}</option>`).join('')}</select>`:''}
-${S.p?`<label>Progress (%)</label><input name="_p" type="number" min="0" max="100" value="${x.p||0}">`:''}
-<label>Tags (comma separated)</label><input name="_t" value="${esc(x.tags.join(', '))}">
-<div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">Save</button></div></form>`);
-const f=$('#fm input');if(f)f.focus()}
 function ask(id){const x=db.find(o=>o.id==id);modal(`<h1>Delete entry?</h1><p class="mu">“${esc(x.f.name)}” will be permanently removed.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="del2" data-id="${id}">Delete</button></div>`)}
 function pal(){modal(`<input id="pq" placeholder="Search everything…" autocomplete="off"><div id="pr" style="margin-top:8px"></div>`);$('#pq').focus();$('#pq').oninput=pr;pr()}
 function pr(){const t=$('#pq').value,r=db.filter(x=>t&&hit(x,t)).slice(0,12);$('#pr').innerHTML=r.map(x=>`<div class="li" data-a="edit" data-id="${x.id}"><span class="row">${ic(SC[x.type].i)}${esc(x.f.name)}</span><span class="mu">${SC[x.type].l}</span></div>`).join('')||`<div class="mu" style="padding:8px">${t?'No results':'Type to search all sections'}</div>`;if(window.lucide)lucide.createIcons()}
 function go(v){view=v;q='';sf='';if(innerWidth<800)col=true;render()}
-let DR=null;const clr=()=>document.querySelectorAll('.slot.over').forEach(x=>x.classList.remove('over'));
-document.addEventListener('dragstart',e=>{const h=e.target.closest&&e.target.closest('[data-drag]');if(!h)return;DR={k:h.dataset.drag,id:h.dataset.id};e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',DR.id);e.dataTransfer.setDragImage(h.closest('.note')||h,20,10)}catch(x){}});
-document.addEventListener('dragover',e=>{if(!DR)return;const z=e.target.closest('.slot');if(z&&z.parentElement.classList.contains(DR.k=='n'?'sk':'pb')){e.preventDefault();clr();z.classList.add('over')}});
-document.addEventListener('drop',e=>{if(!DR)return;const z=e.target.closest('.slot');if(z&&z.parentElement.classList.contains(DR.k=='n'?'sk':'pb')){e.preventDefault();moveTo(DR.k,DR.id,+z.dataset.slot)}DR=null;clr()});
-document.addEventListener('dragend',()=>{DR=null;clr()});
+
+let VT={key:null,items:[],q:'',err:'',show:{},tm:null};
+const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)},unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function dk(pw,salt){const m=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function vSeal(){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},VT.key,new TextEncoder().encode(JSON.stringify(VT.items))));vault.iv=b64(iv);vault.ct=b64(ct);persist()}
+function vkick(){clearTimeout(VT.tm);if(VT.key)VT.tm=setTimeout(()=>{VT.key=null;VT.items=[];VT.show={};if(view=='vault')render()},300000)}
+const genPw=(n=18)=>{const c='abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*-_=+?',r=crypto.getRandomValues(new Uint32Array(n));return [...r].map(v=>c[v%c.length]).join('')};
+async function vSetup(f){const v=Object.fromEntries(new FormData(f));VT.err='';if(v.p!==v.p2)VT.err='The two passwords do not match.';else if(v.p.length<8)VT.err='Use at least 8 characters.';
+else{const salt=crypto.getRandomValues(new Uint8Array(16));vault={salt:b64(salt)};VT.key=await dk(v.p,salt);VT.items=[];await vSeal();vkick()}render()}
+async function vUnlock(f){const v=Object.fromEntries(new FormData(f));VT.err='';try{const k=await dk(v.p,unb(vault.salt)),pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb(vault.iv)},k,unb(vault.ct));VT.items=JSON.parse(new TextDecoder().decode(pt));VT.key=k;vkick()}catch(e){VT.err='Wrong master password.'}render()}
+async function vChange(f){const v=Object.fromEntries(new FormData(f));if(v.p!==v.p2||v.p.length<8){toast('Passwords must match and be 8+ characters.');return}const salt=crypto.getRandomValues(new Uint8Array(16));vault.salt=b64(salt);VT.key=await dk(v.p,salt);await vSeal();modal('');toast('Master password changed')}
+async function vSave(f){const v=Object.fromEntries(new FormData(f)),ex=VT.items.find(o=>o.id==f.dataset.id),o=ex||{id:uid(),at:Date.now()};['s','url','u','p','n'].forEach(k=>o[k]=(v[k]||'').trim());if(!ex)VT.items.push(o);await vSeal();modal('');render()}
+function vform(id){const v=VT.items.find(o=>o.id==id)||{};modal(`<form id="vf" data-id="${id||''}"><h1>${id?'Edit':'Add'} password</h1><label>Site / app *</label><input name="s" required value="${esc(v.s)}"><label>Website address</label><input name="url" value="${esc(v.url)}"><label>Username / email</label><input name="u" value="${esc(v.u)}" autocomplete="off"><label>Password</label><div class="row"><input name="p" type="text" value="${esc(v.p)}" autocomplete="off" style="font-family:monospace"><button type="button" class="btn" data-a="vgen">Generate</button></div><label>Notes</label><textarea name="n" rows="3">${esc(v.n)}</textarea><div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">Save</button></div></form>`)}
+function vview(){const H='<h1>Password Manager</h1>',err=VT.err?`<div class="dn" style="margin:8px 0">${esc(VT.err)}</div>`:'';
+if(!vault)return H+`<form id="vs" class="cd" style="max-width:460px;margin-top:14px"><h2>CREATE MASTER PASSWORD</h2><div class="mu">Everything in this vault is encrypted on your device with this password. It cannot be recovered if you forget it — write it down somewhere safe.</div><label>Master password (8+ characters)</label><input name="p" type="password" required autocomplete="new-password"><label>Repeat master password</label><input name="p2" type="password" required autocomplete="new-password">${err}<div><button class="btn pri">${ic('key')} Create vault</button></div></form>`;
+if(!VT.key)return H+`<form id="vu" class="cd" style="max-width:460px;margin-top:14px"><h2>VAULT LOCKED</h2><label>Master password</label><input name="p" type="password" required autocomplete="current-password">${err}<div><button class="btn pri">${ic('key')} Unlock</button></div></form>`;
+const l=VT.items.filter(v=>!VT.q||(v.s+' '+v.u+' '+v.url).toLowerCase().includes(VT.q.toLowerCase()));
+return `<div class="row sp" style="margin-bottom:6px;flex-wrap:wrap"><div>${H}<div class="mu">${VT.items.length} saved · encrypted on this device · locks after 5 min idle</div></div><div class="row" style="flex-wrap:wrap"><button class="btn pri" data-a="vadd">${ic('plus')} Add password</button><button class="btn" data-a="vpw">Change master</button><button class="btn" data-a="vlock">${ic('lock')} Lock</button></div></div>
+<div class="row" style="margin:14px 0"><input id="vq" placeholder="Search passwords…" value="${esc(VT.q)}"></div>
+${l.length?`<div class="grid">${l.map(v=>`<div class="cd"><b>${esc(v.s)}</b><div class="mu">${esc(v.u)}</div><code style="word-break:break-all">${VT.show[v.id]?esc(v.p):'••••••••••••'}</code>${v.n?`<div class="mu">${esc(v.n)}</div>`:''}<div class="row" style="flex-wrap:wrap;margin-top:auto"><button class="btn" data-a="vcopy" data-id="${v.id}" data-f="u">Copy user</button><button class="btn" data-a="vcopy" data-id="${v.id}" data-f="p">Copy pass</button><button class="btn ic" data-a="vshow" data-id="${v.id}" title="Show / hide">${ic('eye')}</button>${v.url?`<a class="btn ic" href="${esc(norm(v.url))}" target="_blank" rel="noopener" title="Open site">${ic('external-link')}</a>`:''}<button class="btn ic" data-a="vedit" data-id="${v.id}" title="Edit">${ic('pencil')}</button><button class="btn ic dg" data-a="vdel" data-id="${v.id}" title="Delete">${ic('trash-2')}</button></div></div>`).join('')}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${VT.q?'No matches.':'No passwords saved yet.'}</p></div>`}`}
+
+const dlBlob=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)};
+function libv(){const l=FL.filter(m=>!lq||m.name.toLowerCase().includes(lq.toLowerCase()));
+return `<div class="row sp" style="margin-bottom:14px;flex-wrap:wrap"><div><h1>Library</h1><div class="mu">${FL.length} files · stored on this device</div></div><button class="btn pri" data-a="lup">${ic('upload')} Upload files</button></div><div class="row" style="margin-bottom:14px"><input id="lq" placeholder="Filter library…" value="${esc(lq)}"></div>
+${l.length?`<div class="grid">${l.map(m=>`<div class="cd"><b style="word-break:break-all">${esc(m.name)}</b><div class="mu">${esc((m.type||'file').split('/').pop())} · ${fsz(m.size||0)} · ${new Date(m.at).toLocaleDateString()}</div><div class="row" style="margin-top:auto"><button class="btn" data-a="lopen" data-id="${m.id}">${ic('external-link')} Open</button><button class="btn" data-a="ldl" data-id="${m.id}">${ic('download')}</button><span style="flex:1"></span><button class="btn ic dg" data-a="ldel" data-id="${m.id}" title="Delete">${ic('trash-2')}</button></div></div>`).join('')}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${lq?'No files match.':'Your library is empty — upload PDFs, books, documents or images.'}</p></div>`}`}
+const getFile=id=>idb('files','readonly',s=>s.get(id));
+async function exportAll(){const files=[];for(const m of FL){const r=await getFile(m.id);files.push({...m,b64:await new Promise(ok=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.readAsDataURL(r.blob)})})}dlBlob(new Blob([JSON.stringify({kh:2,data:payload(),files})],{type:'application/json'}),'knowledge-hub-backup-'+new Date().toISOString().slice(0,10)+'.json')}
+async function importApply(){const j=PEND;PEND=null;const d=j.data||j;apply(d);if(j.files){await idb('files','readwrite',s=>s.clear());FL=[];for(const f of j.files){const {b64,...m}=f,blob=await (await fetch(b64)).blob();await idb('files','readwrite',s=>s.put({...m,blob}));FL.push(m)}}await flush();render();toast('Data imported')}
+function pickJson(){return new Promise(ok=>{const f=document.createElement('input');f.type='file';f.accept='.json,application/json';f.onchange=async()=>{try{ok(JSON.parse(await f.files[0].text()))}catch(e){toast('That file is not a valid backup.');ok(null)}};f.click()})}
+function confirmImport(j){PEND=j;modal(`<h1>Replace all data?</h1><p class="mu">Everything currently on this device will be replaced by the contents of this file.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" data-a="bimp2">Replace</button></div>`)}
+
+function form(t,id){const S=SC[t],stl=eff(t),x=db.find(o=>o.id==id)||(t=='university'&&db.find(o=>o.type==t))||{f:{},c:{},dl:[],tags:[],status:stl[0]||'',p:0},cf=CFG.fields[t]||[],c=x.c||{};
+modal(`<form id="fm" data-t="${t}" data-id="${x.id||''}"><h1>${x.id?'Edit':'Add'} ${S.l.replace(/s$/,'')}</h1>${S.f.map(([k,l,ty,r])=>`<label>${l}${r?' *':''}</label>${ty=='textarea'?`<textarea name="${k}" rows="4">${esc(x.f[k])}</textarea>`:`<input name="${k}" type="${ty=='date'?'date':'text'}" ${r?'required':''} value="${esc(x.f[k])}">`}`).join('')}
+${stl.length?`<label>${S.sl||'Status'}</label><select name="_s">${stl.map(s=>`<option ${x.status==s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}
+${S.p?`<label>Progress (%)</label><input name="_p" type="number" min="0" max="100" value="${x.p||0}">`:''}
+${cf.map(f=>`<label>${esc(f.l)}</label>${f.t=='checkbox'?`<input type="checkbox" name="c_${f.id}" style="width:auto" ${c[f.id]?'checked':''}>`:f.t=='select'?`<select name="c_${f.id}"><option value=""></option>${(f.o||[]).map(o=>`<option ${c[f.id]==o?'selected':''}>${esc(o)}</option>`).join('')}</select>`:`<input name="c_${f.id}" type="${f.t=='number'?'number':f.t=='date'?'date':'text'}" value="${esc(c[f.id])}">`}`).join('')}
+<label>Deadlines</label><div id="dlrows">${(x.dl||[]).map(dlrow).join('')}</div><button type="button" class="btn" data-a="dladd" style="margin-top:6px">${ic('plus')} Add deadline</button>
+<label>Tags (comma separated)</label><input name="_t" value="${esc((x.tags||[]).join(', '))}">
+<div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">Save</button></div></form>`);const f=$('#fm input');if(f)f.focus()}
+function render(){const g=(h,a)=>`<div class="gh">${h}</div>`+a.map(([k,l,i,n])=>`<button class="nv ${view==k?'on':''}" data-go="${k}" title="${l}">${ic(i)}<span class="lb">${l}</span>${n?`<em class="lb">${n}</em>`:''}</button>`).join('');
+$('#app').className=col?'c':'';
+$('#nav').innerHTML=g('Main',[['dashboard','Dashboard','layout-dashboard'],['favorites','Favorites','star',db.filter(x=>x.fav).length||''],['calendar','Deadlines','calendar',dls().filter(o=>!o.done).length||'']])+g('Knowledge',Object.entries(SC).map(([k,s])=>[k,s.l,s.i,db.filter(x=>x.type==k).length||'']))+g('Tools',[['library','Library','archive',FL.length||''],['translate','Translator','languages'],['vault','Password Manager','key']])+g('System',[['settings','Settings','settings']])+`<div class="mu lb" id="sy" style="padding:14px 10px 0">${esc(SAVED)}</div>`;
+$('#body').innerHTML=view=='university'?uni():SC[view]?listView(view):({dashboard:dash,favorites:favs,calendar:cal,settings:sets,library:libv,translate:trv,vault:vview})[view]();
+const SL=$('#sl');SL.style.top=document.querySelector('header').offsetHeight+'px';SL.innerHTML=layerHTML();document.querySelectorAll('.sbtn').forEach(b=>b.style.display=(view=='dashboard'||view=='vault')?'none':'');
+if(window.lucide)lucide.createIcons()}
 let SH=true,Z=30;
 function defPos(k,i,W,H){const L=$('#sl');W=W||L.clientWidth;H=H||L.clientHeight;const c=i%5;return k=='n'?{x:Math.max(8,W-250-c*30),y:16+c*36}:{x:Math.max(8,W-180-c*30),y:Math.max(8,H-170-c*30)}}
 const noteHTML=(n,p)=>`<div class="note" data-id="${n.id}" style="${p};--r:${n.r||0}deg"><span class="dh" title="Drag to move — it snaps into place">⠿ DRAG</span><button class="x" data-a="sdel" data-id="${n.id}" title="Remove note">×</button><textarea data-sid="${n.id}" placeholder="Sticky note — jot something down…">${esc(n.t)}</textarea>
 ${(n.l||[]).map(i=>`<div class="ck"><input type="checkbox" data-cid="${n.id}" data-iid="${i.id}" ${i.d?'checked':''}><input class="ct ${i.d?'d2':''}" data-nid="${n.id}" data-iid="${i.id}" value="${esc(i.t)}" placeholder="List item"><button class="x2" data-a="cdel" data-id="${n.id}" data-i="${i.id}" title="Remove item">×</button></div>`).join('')}
 <div class="nb"><button data-a="cadd" data-id="${n.id}">☐ LIST</button></div></div>`;
 const picHTML=(p,pos)=>`<div class="pol" data-id="${p.id}" style="${pos}"><img src="${p.d}" alt="" draggable="false"><button class="x2" data-a="idel" data-i="${p.id}" title="Remove picture">×</button></div>`;
-function layerHTML(){if(view=='dashboard'||!SH)return '';const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,n=st[view]||[],p=pics[view]||[];let dn=false,dp=false;
+function layerHTML(){if(view=='dashboard'||view=='vault'||!SH)return '';const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,n=st[view]||[],p=pics[view]||[];let dn=false,dp=false;
 const pos=(it,k,i)=>{if(typeof it.x!='number'||typeof it.y!='number'){Object.assign(it,defPos(k,i,W,H));k=='n'?dn=true:dp=true}return `left:${Math.max(0,Math.min(it.x,W-(k=='n'?220:150)))}px;top:${Math.max(0,Math.min(it.y,H-(k=='n'?150:130)))}px`};
 const h=n.map((o,i)=>noteHTML(o,pos(o,'n',i))).join('')+p.map((o,i)=>picHTML(o,pos(o,'p',i))).join('');if(dn)saveSt();if(dp)savePic();return h}
 const GRID=24,TH=14;
@@ -313,6 +291,8 @@ PD.el.style.left=x+'px';PD.el.style.top=y+'px';PD.nx=x;PD.ny=y});
 const endDrag=()=>{if(!PD)return;const d=PD;PD=null;d.el.classList.remove('drag');if(!d.moved){if(d.k=='p')showPic(d.it.id);return}d.it.x=d.nx;d.it.y=d.ny;d.k=='n'?saveSt():savePic()};
 document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);
 window.addEventListener('resize',()=>{if(SH&&view!='dashboard')$('#sl').innerHTML=layerHTML()});
+
+const clip=t=>{try{navigator.clipboard.writeText(t)}catch(e){}};
 document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){$('.mn')?.remove();return go(g.dataset.go)}
 const a=e.target.closest('[data-a]');if(!a){$('.mn')?.remove();return}const A=a.dataset.a,id=a.dataset.id,x=db.find(o=>o.id==id);
 if(A=='x'){if(e.target==a)modal('');return}if(A=='x2')return modal('');
@@ -325,43 +305,63 @@ else if(A=='edit')form(x.type,id);
 else if(A=='del')ask(id);
 else if(A=='del2'){db=db.filter(o=>o.id!=id);save();modal('');render()}
 else if(A=='fav'){x.fav=!x.fav;save();render()}
-else if(A=='vis'){x.visited=Date.now();save();return}
-else if(A=='imp'){try{const v=JSON.parse($('#ex').value);if(!Array.isArray(v))throw 0;db=v;save();render()}catch(_){toast('That is not valid backup JSON.')}}
-else if(A=='clr'){modal(`<h1>Delete all data?</h1><p class="mu">This removes every entry from this browser.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="clr2">Delete all</button></div>`)}
+else if(A=='skin'){setSkin(a.dataset.k);render()}
+else if(A=='dladd'){$('#dlrows').insertAdjacentHTML('beforeend',dlrow({}));if(window.lucide)lucide.createIcons()}
+else if(A=='dlrm')a.closest('.dlrow').remove();
+else if(A=='cfadd'){const t=a.dataset.t,n=$('#cn-'+t).value.trim(),ty=$('#ct-'+t).value;if(!n)return toast('Give the field a name.');(CFG.fields[t]=CFG.fields[t]||[]).push({id:uid(),l:n,t:ty,o:ty=='select'?$('#co-'+t).value.split(',').map(s=>s.trim()).filter(Boolean):undefined});persist();render()}
+else if(A=='cfdel'){CFG.fields[a.dataset.t]=(CFG.fields[a.dataset.t]||[]).filter(f=>f.id!=id);persist();render()}
 else if(A=='sadd'){const l=st[view]=st[view]||[];l.push({id:uid(),t:'',r:+(Math.random()*4-2).toFixed(1),...defPos('n',l.length)});saveSt();render();document.querySelector('.note[data-id="'+l[l.length-1].id+'"] textarea')?.focus()}
 else if(A=='shide'){SH=!SH;render()}
-else if(A=='tswap'){const f=tr.f=='Auto-detect'?'English':tr.f;tr.f=tr.t;tr.t=f;if(tr.o){tr.i=tr.o;tr.o=''}saveTr();render()}
-else if(A=='tcopy'){const o=$('#to');if(o&&o.value){o.select();try{navigator.clipboard.writeText(o.value)}catch(e){}try{document.execCommand('copy')}catch(e){}}}
-else if(A=='tgo'){if(!tr.i.trim()||tr.b)return;tr.b=true;tr.e='';tr.o='';render();gtr(tr.i,tr.f,tr.t).then(o=>tr.o=o).catch(e=>tr.e=e.message||'Translation failed — try again.').finally(()=>{tr.b=false;if(view=='translate')render()})}
-else if(A=='skin'){setSkin(a.dataset.k);render()}
-else if(A=='pick'){try{localStorage.setItem("kh-cur",id);localStorage.setItem("kh-out","")}catch(x){}location.reload()}
-else if(A=='signout'){(async()=>{try{if(SB)await SB.auth.signOut()}catch(x){}try{localStorage.setItem("kh-cur","");localStorage.setItem("kh-out","1")}catch(x){}location.reload()})()}
-else if(A=='google'){try{localStorage.setItem("kh-out","")}catch(x){}SB.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}})}
-else if(A=='cloud'){if(CU)adoptCloud()}
-else if(A=='gdc'){GD.busy=true;render();gdLoad().catch(e=>toast(e.message)).finally(()=>{GD.busy=false;render()})}
-else if(A=='lup'){const f=document.createElement('input');f.type='file';f.multiple=true;f.onchange=async()=>{GD.busy=true;render();try{for(const fl of f.files)await gdUp(fl);await gdLoad();toast('Uploaded to your Google Drive')}catch(e){toast(e.message)}GD.busy=false;render()};f.click()}
-else if(A=='ldel'){const m=GD.files.find(o=>o.id==id);modal(`<h1>Delete file?</h1><p class="mu">“${esc(m.name)}” will be permanently deleted from your Google Drive.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="ldel2" data-id="${esc(id)}">Delete</button></div>`)}
-else if(A=='ldel2'){modal('');gd('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id),{method:'DELETE'}).then(gdLoad).catch(e=>toast(e.message)).finally(render)}
-else if(A=='sjadd'){sjform()}
-else if(A=='sjedit'){sjform(id)}
-else if(A=='sjdel'){const u=db.find(x=>x.type=='university'),j=u.subjects.find(o=>o.id==id);modal(`<h1>Delete subject?</h1><p class="mu">“${esc(j.n)}” will be removed.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="sjdel2" data-id="${id}">Delete</button></div>`)}
-else if(A=='sjdel2'){const u=db.find(x=>x.type=='university');u.subjects=u.subjects.filter(o=>o.id!=id);save();modal('');render()}
-else if(A=='smv'||A=='pmv'){const ar=A=='smv'?st[view]:pics[view],it=ar.find(o=>o.id==id);moveTo(A=='smv'?'n':'p',id,Math.max(0,Math.min(it.s+(+a.dataset.d),(A=='smv'?NS:NP)-1)))}
-else if(A=='amode'){AU.m=a.dataset.m;AU.err='';gate()}
-else if(A=='aresend'){SB.auth.resend({type:'signup',email:AU.e}).then(r=>{toast(r.error?'Could not resend: '+r.error.message:'A new code was sent');})}
+else if(A=='sdel'){st[view]=st[view].filter(n=>n.id!=id);saveSt();render()}
 else if(A=='cadd'){const n=st[view].find(o=>o.id==id);(n.l=n.l||[]).push({id:uid(),d:false,t:''});saveSt();render();const t=document.querySelectorAll('.ct');t[t.length-1]?.focus()}
 else if(A=='cdel'){const n=st[view].find(o=>o.id==id);n.l=n.l.filter(i=>i.id!=a.dataset.i);saveSt();render()}
 else if(A=='idel'){pics[view]=pics[view].filter(p=>p.id!=a.dataset.i);savePic();render()}
-else if(A=='pview'){const p=pics[view].find(o=>o.id==a.dataset.i);modal(`<img src="${p.d}" alt="" style="width:100%;display:block"><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-a="x2">Close</button></div>`)}
-else if(A=='iadd'){const sl=+a.dataset.s||0;const f=document.createElement('input');f.type='file';f.accept='image/*';f.onchange=()=>{const fl=f.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,700/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);(pics[view]=pics[view]||[]).push({id:uid(),...defPos('p',(pics[view]||[]).length),d:c.toDataURL('image/jpeg',.72)});savePic();render()};im.src=r.result};r.readAsDataURL(fl)};f.click()}
-else if(A=='sdel'){st[view]=st[view].filter(n=>n.id!=id);saveSt();render()}
-else if(A=='clr2'){db=[];save();modal('');render()}});
-document.addEventListener('submit',e=>{e.preventDefault();if(e.target.id=='af'){authSubmit(e.target);return}if(e.target.id=='sf'){subjSave(e.target);return}if(e.target.id=='pf'){const n=new FormData(e.target).get('n').trim();if(!n)return;const id=PR.length?uid():'p0';PR.push({id,name:n});try{localStorage.setItem("kh-profiles",JSON.stringify(PR));localStorage.setItem("kh-cur",id);localStorage.setItem("kh-out","")}catch(x){}location.reload();return}const f=e.target,t=f.dataset.t,v=Object.fromEntries(new FormData(f)),S=SC[t],o=db.find(x=>x.id==f.dataset.id)||(t=='university'&&db.find(x=>x.type==t))||{id:uid(),type:t,at:Date.now(),fav:false},nf={};
+else if(A=='iadd'){const f=document.createElement('input');f.type='file';f.accept='image/*';f.onchange=()=>{const fl=f.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,700/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);(pics[view]=pics[view]||[]).push({id:uid(),...defPos('p',(pics[view]||[]).length),d:c.toDataURL('image/jpeg',.78)});savePic();render()};im.src=r.result};r.readAsDataURL(fl)};f.click()}
+else if(A=='sjadd')sjform();else if(A=='sjedit')sjform(id);
+else if(A=='sjdel'){const u=db.find(x=>x.type=='university'),j=u.subjects.find(o=>o.id==id);modal(`<h1>Delete subject?</h1><p class="mu">“${esc(j.n)}” will be removed.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="sjdel2" data-id="${id}">Delete</button></div>`)}
+else if(A=='sjdel2'){const u=db.find(x=>x.type=='university');u.subjects=u.subjects.filter(o=>o.id!=id);save();modal('');render()}
+else if(A=='lup'){const f=document.createElement('input');f.type='file';f.multiple=true;f.onchange=async()=>{try{for(const fl of f.files){const m={id:uid(),name:fl.name,type:fl.type,size:fl.size,at:Date.now()};await idb('files','readwrite',s=>s.put({...m,blob:fl}));FL.push(m)}toast('Saved to your library')}catch(e){toast('Could not save file: '+(e.message||e))}render()};f.click()}
+else if(A=='lopen'){const w=window.open('','_blank');getFile(id).then(r=>{const u=URL.createObjectURL(r.blob);if(w)w.location=u;else dlBlob(r.blob,r.name)})}
+else if(A=='ldl'){getFile(id).then(r=>dlBlob(r.blob,r.name))}
+else if(A=='ldel'){const m=FL.find(o=>o.id==id);modal(`<h1>Delete file?</h1><p class="mu">“${esc(m.name)}” will be permanently removed from your library.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="ldel2" data-id="${id}">Delete</button></div>`)}
+else if(A=='ldel2'){modal('');idb('files','readwrite',s=>s.delete(id)).then(()=>{FL=FL.filter(o=>o.id!=id);render()})}
+else if(A=='flink'){showSaveFilePicker({suggestedName:'knowledge-hub-data.json',types:[{description:'JSON',accept:{'application/json':['.json']}}]}).then(async h=>{FH=h;FHok=true;await idb('kv','readwrite',s=>s.put(h,'fh'));await fileWrite();toast('Data file linked');render()}).catch(()=>{})}
+else if(A=='freconn'){FH.requestPermission({mode:'readwrite'}).then(async p=>{FHok=p=='granted';if(FHok)await fileWrite();render()})}
+else if(A=='fload'){FH.getFile().then(f=>f.text()).then(t=>confirmImport(JSON.parse(t))).catch(()=>toast('Could not read the linked file.'))}
+else if(A=='bexp'){exportAll().catch(e=>toast('Export failed: '+(e.message||e)))}
+else if(A=='bimp'){pickJson().then(j=>j&&confirmImport(j))}
+else if(A=='bimp2'){modal('');importApply().catch(e=>toast('Import failed: '+(e.message||e)))}
+else if(A=='clr')modal(`<h1>Delete all data?</h1><p class="mu">This removes every entry, sticker, library file and the password vault from this device.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="clr2">Delete all</button></div>`);
+else if(A=='clr2'){db=[];st={};pics={};vault=null;CFG={status:{},fields:{}};VT={key:null,items:[],q:'',err:'',show:{},tm:null};FL=[];modal('');idb('files','readwrite',s=>s.clear()).then(flush).then(render)}
+else if(A=='vadd')vform();else if(A=='vedit')vform(id);
+else if(A=='vdel'){const v=VT.items.find(o=>o.id==id);modal(`<h1>Delete password?</h1><p class="mu">“${esc(v.s)}” will be removed from the vault.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="vdel2" data-id="${id}">Delete</button></div>`)}
+else if(A=='vdel2'){VT.items=VT.items.filter(o=>o.id!=id);modal('');vSeal().then(render)}
+else if(A=='vshow'){VT.show[id]=!VT.show[id];render()}
+else if(A=='vcopy'){const v=VT.items.find(o=>o.id==id);clip(v[a.dataset.f]);toast(a.dataset.f=='p'?'Password copied — clearing clipboard in 30 s':'Username copied');if(a.dataset.f=='p')setTimeout(()=>clip(' '),30000)}
+else if(A=='vlock'){VT.key=null;VT.items=[];VT.show={};render()}
+else if(A=='vgen'){const i=document.querySelector('#vf [name=p]');i.value=genPw()}
+else if(A=='vpw')modal(`<form id="vp"><h1>Change master password</h1><label>New master password (8+ characters)</label><input name="p" type="password" required autocomplete="new-password"><label>Repeat new password</label><input name="p2" type="password" required autocomplete="new-password"><div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">Change</button></div></form>`);
+else if(A=='tswap'){const f=tr.f=='Auto-detect'?'English':tr.f;tr.f=tr.t;tr.t=f;if(tr.o){tr.i=tr.o;tr.o=''}saveTr();render()}
+else if(A=='tcopy'){const o=$('#to');if(o&&o.value){o.select();clip(o.value);try{document.execCommand('copy')}catch(e){}}}
+else if(A=='tgo'){if(!tr.i.trim()||tr.b)return;tr.b=true;tr.e='';tr.o='';render();gtr(tr.i,tr.f,tr.t).then(o=>tr.o=o).catch(e=>tr.e=e.message||'Translation failed — try again.').finally(()=>{tr.b=false;if(view=='translate')render()})}});
+document.addEventListener('submit',e=>{e.preventDefault();const f=e.target;
+if(f.id=='sf')return subjSave(f);if(f.id=='vs')return vSetup(f);if(f.id=='vu')return vUnlock(f);if(f.id=='vp')return vChange(f);if(f.id=='vf')return vSave(f);if(f.id!='fm')return;
+const t=f.dataset.t,v=Object.fromEntries(new FormData(f)),S=SC[t],o=db.find(x=>x.id==f.dataset.id)||(t=='university'&&db.find(x=>x.type==t))||{id:uid(),type:t,at:Date.now(),fav:false},nf={};
 S.f.forEach(([k])=>nf[k]=(v[k]||'').trim());o.f=nf;o.status=v._s||'';o.p=Math.max(0,Math.min(100,+v._p||0));o.tags=(v._t||'').split(',').map(s=>s.trim().replace(/^#/,'')).filter(Boolean);
+o.c={};(CFG.fields[t]||[]).forEach(cf=>{const el=f.querySelector('[name="c_'+cf.id+'"]');o.c[cf.id]=cf.t=='checkbox'?el.checked:(el.value||'').trim()});
+o.dl=[...f.querySelectorAll('.dlrow')].map(r=>({id:r.dataset.id||uid(),t:r.querySelector('[name=dt]').value.trim(),d:r.querySelector('[name=dd]').value,done:r.querySelector('.dcb').checked})).filter(d=>d.d);
 if(!db.includes(o))db.push(o);save();modal('');render()});
-document.addEventListener('input',e=>{if(e.target.dataset.sid){const n=st[view].find(o=>o.id==e.target.dataset.sid);if(n){n.t=e.target.value;saveSt()}return}if(e.target.dataset.nid){const i=st[view].find(o=>o.id==e.target.dataset.nid).l.find(o=>o.id==e.target.dataset.iid);i.t=e.target.value;saveSt();return}if(e.target.id=='ti'){tr.i=e.target.value;return}if(e.target.id=='lq'){lq=e.target.value;const p=e.target.selectionStart;render();const n=$('#lq');n.focus();n.setSelectionRange(p,p);return}if(e.target.id=='fq'){q=e.target.value;const p=e.target.selectionStart;render();const n=$('#fq');n.focus();n.setSelectionRange(p,p)}});
-document.addEventListener('change',e=>{if(e.target.id=='tf'||e.target.id=='tt'){tr[e.target.id=='tf'?'f':'t']=e.target.value;saveTr();return}if(e.target.dataset.cid){const i=st[view].find(o=>o.id==e.target.dataset.cid).l.find(o=>o.id==e.target.dataset.iid);i.d=e.target.checked;saveSt();render();return}if(e.target.id=='fs'){sf=e.target.value;render()}});
+document.addEventListener('input',e=>{const T=e.target,keep=(id,fn)=>{fn(T.value);const p=T.selectionStart;render();const n=$('#'+id);if(n){n.focus();n.setSelectionRange(p,p)}};
+if(T.dataset.sid){const n=st[view].find(o=>o.id==T.dataset.sid);if(n){n.t=T.value;saveSt()}return}
+if(T.dataset.nid){const i=st[view].find(o=>o.id==T.dataset.nid).l.find(o=>o.id==T.dataset.iid);i.t=T.value;saveSt();return}
+if(T.id=='ti'){tr.i=T.value;return}if(T.id=='fq')return keep('fq',v=>q=v);if(T.id=='lq')return keep('lq',v=>lq=v);if(T.id=='vq')return keep('vq',v=>VT.q=v)});
+document.addEventListener('change',e=>{const T=e.target;
+if(T.dataset.dd){const x=db.find(o=>o.id==T.dataset.dd),d=x&&(x.dl||[]).find(o=>o.id==T.dataset.k);if(d){d.done=T.checked;save();render()}return}
+if(T.dataset.cid){const i=st[view].find(o=>o.id==T.dataset.cid).l.find(o=>o.id==T.dataset.iid);i.d=T.checked;saveSt();render();return}
+if(T.dataset.cs){CFG.status[T.dataset.cs]=T.value.split(',').map(s=>s.trim()).filter(Boolean);persist();render();return}
+if(T.id=='tf'||T.id=='tt'){tr[T.id=='tf'?'f':'t']=T.value;saveTr();return}if(T.id=='fs'){sf=T.value;render()}});
 document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.dataset.nid){e.preventDefault();const n=st[view].find(o=>o.id==e.target.dataset.nid);n.l.push({id:uid(),d:false,t:''});saveSt();render();const t=document.querySelectorAll('.ct');t[t.length-1].focus();return}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();pal()}if(e.key=='Escape')modal('')});
-Object.keys(st).forEach(v=>st[v].forEach(n=>{if(n.im&&n.im.length){(pics[v]=pics[v]||[]).push(...n.im.map(d=>({id:uid(),d})));delete n.im;saveSt();savePic()}}));
-me?render():gate();cloudInit();
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,vkick,true));
+addEventListener('pagehide',flush);document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
+boot();
 </script></body></html>
