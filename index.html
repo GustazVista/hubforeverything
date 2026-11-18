@@ -112,6 +112,13 @@ main{position:relative}
 #sl .dh:active{cursor:grabbing}
 .dlrow{margin-bottom:4px}.dlrow input[type=checkbox]{width:18px;height:18px;flex:none;margin:4px 0}.dlrow input{margin:4px 0}
 .li input[type=checkbox]{width:16px;height:16px;flex:none;margin:0;accent-color:var(--ac)}code{background:var(--hv);padding:2px 6px}
+.rz{position:absolute;right:2px;bottom:2px;width:16px;height:16px;cursor:nwse-resize;touch-action:none;opacity:.75;background:linear-gradient(135deg,transparent 48%,var(--ink) 48% 58%,transparent 58% 70%,var(--ink) 70% 80%,transparent 80%)}
+#sl .note{display:flex;flex-direction:column;overflow:auto;min-height:110px}#sl .note textarea{flex:1 1 90px;height:auto;min-height:60px}
+#sl .pol img{height:auto;width:100%;display:block}
+.fgrid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-bottom:18px}
+.fold{display:flex;flex-direction:column;gap:4px;padding:14px;border:2px solid var(--bd);background:var(--pn);cursor:pointer;box-shadow:var(--gl);transition:border-color .15s}
+.fold:hover,.over{border-color:var(--ac)!important;background:var(--hv)}.fold.add{border-style:dashed;color:var(--ac)}.fold svg{width:22px;height:22px;color:var(--ac)}
+.grid.lst{grid-template-columns:1fr}.fav{width:16px;height:16px;vertical-align:-3px}.cd[draggable=true]{cursor:grab}
 </style></head>
 <body><div id="app"><aside><div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>KNOWLEDGE//HUB</span></div><nav id="nav"></nav></aside>
 <main><header><button class="btn ic" data-a="tog" title="Toggle sidebar"><i data-lucide="panel-left"></i></button>
@@ -125,7 +132,7 @@ const SC={
 university:{l:'My University',i:'graduation-cap',f:[['name','University name','text',1],['platform','Learning platform (Moodle, Canvas, HEMIS…)'],['platformUrl','Platform link','url'],['portal','Student portal link','url'],['major','Major / program'],['year','Year / semester'],['gpa','Current GPA'],['notes','Notes','textarea']]},
 courses:{l:'Courses & Learning',i:'book-open',s:['want to learn','planned','in progress','completed','paused'],dl:'start',p:1,f:[['name','Course name','text',1],['platform','Platform'],['instructor','Instructor'],['url','Course URL','url'],['start','Start date','date'],['notes','Notes','textarea']]},
 projects:{l:'Projects',i:'folder-kanban',s:['idea','planned','in progress','completed','on hold'],dl:'due',p:1,f:[['name','Project title','text',1],['tech','Technologies'],['url','Live website','url'],['repo','GitHub repository','url'],['due','Expected completion','date'],['notes','Description & notes','textarea']]},
-websites:{l:'Websites & Resources',i:'globe',sl:'Category',s:['Programming','Cybersecurity','Artificial Intelligence','Machine Learning','Research','University Research','Productivity','Design','Writing','Mathematics','Science','Business','Language Learning','Entertainment','Other'],f:[['name','Title','text',1],['url','URL','url',1],['notes','Notes','textarea']]},
+websites:{l:'Websites & Resources',i:'globe',grp:1,sl:'Category',s:['Programming','Cybersecurity','Artificial Intelligence','Machine Learning','Research','University Research','Productivity','Design','Writing','Mathematics','Science','Business','Language Learning','Entertainment','Other'],f:[['name','Title','text',1],['url','URL','url',1],['notes','Notes','textarea']]},
 notes:{l:'Notes & Research',i:'notebook-pen',f:[['name','Title','text',1],['notes','Content','textarea']]},
 books:{l:'Books & Reading',i:'library',s:['want to read','reading','completed','paused'],f:[['name','Title','text',1],['author','Author'],['notes','Review & notes','textarea']]}};
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -134,8 +141,8 @@ const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>(
 const IDBP=new Promise((ok,no)=>{const r=indexedDB.open('khub',1);r.onupgradeneeded=()=>{r.result.createObjectStore('kv');r.result.createObjectStore('files',{keyPath:'id'})};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
 const idb=async(store,mode,fn)=>{const d=await IDBP;return new Promise((ok,no)=>{const t=d.transaction(store,mode),rq=fn(t.objectStore(store));t.oncomplete=()=>ok(rq&&rq.result);t.onerror=()=>no(t.error);t.onabort=()=>no(t.error)})};
 let db=[],st={},pics={},vault=null,view='dashboard',q='',sf='',col=innerWidth<800,FL=[],lq='',skin='cyber',FH=null,FHok=false,SAVED='',PEND=null;
-let CFG={status:{},fields:{}},tr={f:'Auto-detect',t:'English',i:'',o:'',b:false,e:''};
-const payload=()=>({v:2,db,st,pics,vault,cfg:CFG,tr:{f:tr.f,t:tr.t},skin});
+let GR=[],gview='';let CFG={status:{},fields:{}},tr={f:'Auto-detect',t:'English',i:'',o:'',b:false,e:''};
+const payload=()=>({v:2,db,st,pics,vault,groups:GR,cfg:CFG,tr:{f:tr.f,t:tr.t},skin});
 let ptm=null;
 function ss(){const e=document.getElementById('sy');if(e)e.textContent=SAVED}
 async function fileWrite(){if(!FH||!FHok)return;try{const w=await FH.createWritable();await w.write(JSON.stringify(payload()));await w.close()}catch(e){FHok=false;toast('Data file is not writable — reconnect it in Settings.')}}
@@ -143,7 +150,7 @@ async function flush(){clearTimeout(ptm);try{await idb('kv','readwrite',s=>s.put
 function persist(){SAVED='saving…';ss();clearTimeout(ptm);ptm=setTimeout(flush,350)}
 const save=persist,saveSt=persist,savePic=persist,saveTr=persist;
 function setSkin(k){skin=SK[k]?k:'cyber';document.documentElement.dataset.skin=skin;persist()}
-function apply(d){db=(d.db||[]).filter(x=>SC[x.type]);st=d.st||{};pics=d.pics||{};vault=d.vault||null;CFG=Object.assign({status:{},fields:{}},d.cfg||{});if(d.tr){tr.f=d.tr.f||tr.f;tr.t=d.tr.t||tr.t}skin=SK[d.skin]?d.skin:'cyber';document.documentElement.dataset.skin=skin}
+function apply(d){db=(d.db||[]).filter(x=>SC[x.type]);st=d.st||{};pics=d.pics||{};vault=d.vault||null;GR=d.groups||[];CFG=Object.assign({status:{},fields:{}},d.cfg||{});if(d.tr){tr.f=d.tr.f||tr.f;tr.t=d.tr.t||tr.t}skin=SK[d.skin]?d.skin:'cyber';document.documentElement.dataset.skin=skin}
 async function boot(){try{let d=await idb('kv','readonly',s=>s.get('data'));
 if(!d){const g=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};d={db:g('kh')||[],st:g('kh-st')||{},pics:g('kh-pic')||{},tr:g('kh-tr'),skin:localStorage.getItem('kh-skin')}}
 apply(d);FL=(await idb('files','readonly',s=>s.getAll())).map(({blob,...m})=>m);FH=await idb('kv','readonly',s=>s.get('fh'))||null;
@@ -177,17 +184,27 @@ const dlrow=d=>`<div class="dlrow row" data-id="${esc(d.id||'')}"><input type="c
 const dlist=o=>`<div class="li"><span class="row"><input type="checkbox" data-dd="${o.x.id}" data-k="${o.k}" ${o.done?'checked':''} ${o.k=='f'?'disabled':''}><span data-a="edit" data-id="${o.x.id}" style="cursor:pointer;${o.done?'text-decoration:line-through;opacity:.55':''}">${esc(o.x.f.name)} <span class="mu">· ${esc(o.t)}</span></span></span><span>${o.d} · ${o.done?'<span class="mu">done</span>':when(o.d)}</span></div>`;
 function card(x){const S=SC[x.type],sub=S.f.filter(f=>!f[2]&&f[0]!='notes').map(f=>x.f[f[0]]).filter(Boolean).slice(0,2).join(' · '),u=link(x),nd=dls().find(o=>o.x===x&&!o.done),
 cf=(CFG.fields[x.type]||[]).filter(f=>x.c&&x.c[f.id]!==undefined&&x.c[f.id]!==''&&x.c[f.id]!==false).map(f=>`<div class="mu">${esc(f.l)}: ${f.t=='checkbox'?'✓':esc(x.c[f.id])}</div>`).join('');
-return `<div class="cd"><div class="row sp"><b>${esc(x.f.name)}</b><button class="btn ic ${x.fav?'ff':''}" data-a="fav" data-id="${x.id}" title="Favorite" style="border-color:transparent">${ic('star')}</button></div>
-${sub?`<div class="mu">${esc(sub)}</div>`:''}${x.status?`<div><span class="bg">${esc(x.status)}</span></div>`:''}
+return `<div class="cd" ${S.grp?`draggable="true" data-wid="${x.id}"`:''}><div class="row sp"><b>${WC().icons&&u?`<img class="fav" src="https://www.google.com/s2/favicons?sz=32&domain=${encodeURIComponent(norm(u).replace(/^https?:\/\//i,'').split('/')[0])}" alt=""> `:''}${esc(x.f.name)}</b><button class="btn ic ${x.fav?'ff':''}" data-a="fav" data-id="${x.id}" title="Favorite" style="border-color:transparent">${ic('star')}</button></div>
+${sub?`<div class="mu">${esc(sub)}</div>`:''}${x.status?`<div><span class="bg">${esc(x.status)}</span></div>`:''}${S.grp&&x.g&&(q||sf)?`<div class="mu">${ic('folder')} ${esc(gname(x.g))}</div>`:''}
 ${nd?`<div class="row" style="flex-wrap:wrap">${ic('alarm-clock')}<span class="mu">${esc(nd.t)} · ${nd.d} ·</span>${when(nd.d)}</div>`:''}
 ${S.p?`<div class="bar"><i style="width:${x.p||0}%"></i></div><div class="mu">${x.p||0}% complete</div>`:''}${cf}
 ${x.f.notes?`<div class="mu" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(x.f.notes)}</div>`:''}
 ${(x.tags||[]).length?`<div class="tg">${x.tags.map(t=>'#'+esc(t)).join(' ')}</div>`:''}
 <div class="row" style="margin-top:auto">${u?`<a class="btn" href="${esc(norm(u))}" target="_blank" rel="noopener">${ic('external-link')} Open</a>`:''}<span style="flex:1"></span><button class="btn ic" data-a="edit" data-id="${x.id}" title="Edit">${ic('pencil')}</button><button class="btn ic dg" data-a="del" data-id="${x.id}" title="Delete">${ic('trash-2')}</button></div></div>`}
-function listView(t){const S=SC[t],stl=eff(t),it=db.filter(x=>x.type==t&&hit(x,q)&&(!sf||x.status==sf)).sort((a,b)=>b.at-a.at);
-return `<div class="row sp" style="margin-bottom:14px;flex-wrap:wrap"><div><h1>${S.l}</h1><div class="mu">${db.filter(x=>x.type==t).length} saved</div></div><button class="btn pri" data-a="add" data-t="${t}">${ic('plus')} Add</button></div>
-<div class="row" style="margin-bottom:14px"><input id="fq" placeholder="Filter ${S.l.toLowerCase()}…" value="${esc(q)}">${stl.length?`<select id="fs" style="max-width:200px"><option value="">All ${(S.sl||'statuses').toLowerCase()}</option>${stl.map(s=>`<option ${sf==s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}</div>
-${it.length?`<div class="grid">${it.map(card).join('')}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${q||sf?'Nothing matches your filters.':'Nothing saved here yet.'}</p></div>`}`}
+const gname=id=>(GR.find(g=>g.id==id)||{}).n||'';
+const WC=()=>CFG.web||(CFG.web={view:'grid',sort:'new',icons:false});
+const sortIt=(a,m)=>[...a].sort(m=='az'?(x,y)=>x.f.name.localeCompare(y.f.name):m=='fav'?(x,y)=>(y.fav?1:0)-(x.fav?1:0)||y.at-x.at:(x,y)=>y.at-x.at);
+function listView(t){const S=SC[t],stl=eff(t),W=WC(),grp=!!S.grp,flat=!!(q||sf),gs=GR.filter(g=>g.t==t),inG=grp&&gview&&gs.find(g=>g.id==gview);
+let it=db.filter(x=>x.type==t&&hit(x,q)&&(!sf||x.status==sf));
+if(grp&&!flat)it=it.filter(x=>inG?x.g==gview:!x.g||!gs.find(g=>g.id==x.g));
+it=sortIt(it,W.sort);
+const folders=grp&&!flat&&!inG?`<div class="grid fgrid">${gs.map(g=>`<div class="fold" data-a="gopen" data-id="${g.id}" data-gid="${g.id}">${ic('folder')}<b>${esc(g.n)}</b><span class="mu">${db.filter(x=>x.type==t&&x.g==g.id).length} items</span></div>`).join('')}<div class="fold add" data-a="gnew" data-t="${t}">${ic('folder-plus')}<b>New group</b><span class="mu">Drag cards onto a group</span></div></div>`:'';
+const crumb=inG&&!flat?`<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><button class="btn" data-a="gopen" data-id="" data-gid="" title="Drop a card here to remove it from the group">${ic('arrow-left')} All ${esc(S.l.toLowerCase())}</button><b style="font-size:16px">${ic('folder')} ${esc(inG.n)}</b><span style="flex:1"></span><button class="btn" data-a="gall">${ic('external-link')} Open all</button><button class="btn" data-a="grename" data-id="${inG.id}">${ic('pencil')} Rename</button><button class="btn dg" data-a="gdel" data-id="${inG.id}">${ic('trash-2')} Delete group</button></div>`:'';
+const tool=grp?`<select id="ws" style="max-width:150px"><option value="new" ${W.sort!='az'&&W.sort!='fav'?'selected':''}>Newest</option><option value="az" ${W.sort=='az'?'selected':''}>A–Z</option><option value="fav" ${W.sort=='fav'?'selected':''}>Favorites first</option></select><button class="btn ic" data-a="wview" data-v="grid" title="Grid">${ic('layout-grid')}</button><button class="btn ic" data-a="wview" data-v="list" title="List">${ic('list')}</button><label class="row" title="Shows each site's icon (loaded from Google)" style="margin:0;color:var(--mu)"><input type="checkbox" id="wi" style="width:auto;margin:0" ${W.icons?'checked':''}> Icons</label>`:'';
+return `<div class="row sp" style="margin-bottom:14px;flex-wrap:wrap"><div><h1>${S.l}</h1><div class="mu">${db.filter(x=>x.type==t).length} saved</div></div><div class="row">${grp&&!inG?`<button class="btn" data-a="gnew" data-t="${t}">${ic('folder-plus')} New group</button>`:''}<button class="btn pri" data-a="add" data-t="${t}">${ic('plus')} Add</button></div></div>
+<div class="row" style="margin-bottom:14px;flex-wrap:wrap"><input id="fq" placeholder="Filter ${S.l.toLowerCase()}…" value="${esc(q)}" style="flex:1;min-width:160px">${stl.length?`<select id="fs" style="max-width:200px"><option value="">All ${(S.sl||'statuses').toLowerCase()}</option>${stl.map(s=>`<option ${sf==s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}${tool}</div>
+${crumb}${folders}${grp&&!flat&&!inG&&gs.length&&it.length?'<div class="mu" style="margin:0 0 8px">Not in a group</div>':''}
+${it.length?`<div class="grid ${W.view=='list'?'lst':''}">${it.map(card).join('')}</div>`:(folders||crumb)&&!flat?`<div class="mu" style="padding:14px 0">${inG?'This group is empty — drag websites here, or choose the group when adding one.':''}</div>`:`<div class="empty"><div class="e4">ERROR 404</div><p>${flat?'Nothing matches your filters.':'Nothing saved here yet.'}</p></div>`}`}
 function dash(){const n=t=>db.filter(x=>x.type==t).length,all=dls().filter(o=>!o.done),up=all.filter(o=>days(o.d)>=-7).slice(0,8),rec=[...db].sort((a,b)=>b.at-a.at).slice(0,6),fav=db.filter(x=>x.fav).slice(0,5),act=db.filter(x=>SC[x.type].p&&x.status=='in progress'),u=db.find(x=>x.type=='university');
 const li=x=>`<div class="li" data-a="edit" data-id="${x.id}"><span class="row">${ic(SC[x.type].i)}${esc(x.f.name)}</span></div>`;
 return `<div class="mu" style="margin-bottom:4px">${new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}</div><div class="hero"><div class="jp">${SK[skin].h[0]}</div><div class="sub">${SK[skin].h[1]}</div></div><div class="hz"></div>
@@ -221,7 +238,7 @@ function modal(h){$('#mo').innerHTML=h?`<div class="ov" data-a="x"><div class="m
 function ask(id){const x=db.find(o=>o.id==id);modal(`<h1>Delete entry?</h1><p class="mu">“${esc(x.f.name)}” will be permanently removed.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="del2" data-id="${id}">Delete</button></div>`)}
 function pal(){modal(`<input id="pq" placeholder="Search everything…" autocomplete="off"><div id="pr" style="margin-top:8px"></div>`);$('#pq').focus();$('#pq').oninput=pr;pr()}
 function pr(){const t=$('#pq').value,r=db.filter(x=>t&&hit(x,t)).slice(0,12);$('#pr').innerHTML=r.map(x=>`<div class="li" data-a="edit" data-id="${x.id}"><span class="row">${ic(SC[x.type].i)}${esc(x.f.name)}</span><span class="mu">${SC[x.type].l}</span></div>`).join('')||`<div class="mu" style="padding:8px">${t?'No results':'Type to search all sections'}</div>`;if(window.lucide)lucide.createIcons()}
-function go(v){view=v;q='';sf='';if(innerWidth<800)col=true;render()}
+function go(v){view=v;q='';sf='';gview='';if(innerWidth<800)col=true;render()}
 
 let VT={key:null,items:[],q:'',err:'',show:{},tm:null};
 const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)},unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
@@ -253,9 +270,10 @@ async function importApply(){const j=PEND;PEND=null;const d=j.data||j;apply(d);i
 function pickJson(){return new Promise(ok=>{const f=document.createElement('input');f.type='file';f.accept='.json,application/json';f.onchange=async()=>{try{ok(JSON.parse(await f.files[0].text()))}catch(e){toast('That file is not a valid backup.');ok(null)}};f.click()})}
 function confirmImport(j){PEND=j;modal(`<h1>Replace all data?</h1><p class="mu">Everything currently on this device will be replaced by the contents of this file.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" data-a="bimp2">Replace</button></div>`)}
 
-function form(t,id){const S=SC[t],stl=eff(t),x=db.find(o=>o.id==id)||(t=='university'&&db.find(o=>o.type==t))||{f:{},c:{},dl:[],tags:[],status:stl[0]||'',p:0},cf=CFG.fields[t]||[],c=x.c||{};
+function form(t,id){const S=SC[t],stl=eff(t),x=db.find(o=>o.id==id)||(t=='university'&&db.find(o=>o.type==t))||{f:{},c:{},dl:[],tags:[],status:stl[0]||'',p:0,g:gview},cf=CFG.fields[t]||[],c=x.c||{};
 modal(`<form id="fm" data-t="${t}" data-id="${x.id||''}"><h1>${x.id?'Edit':'Add'} ${S.l.replace(/s$/,'')}</h1>${S.f.map(([k,l,ty,r])=>`<label>${l}${r?' *':''}</label>${ty=='textarea'?`<textarea name="${k}" rows="4">${esc(x.f[k])}</textarea>`:`<input name="${k}" type="${ty=='date'?'date':'text'}" ${r?'required':''} value="${esc(x.f[k])}">`}`).join('')}
 ${stl.length?`<label>${S.sl||'Status'}</label><select name="_s">${stl.map(s=>`<option ${x.status==s?'selected':''}>${esc(s)}</option>`).join('')}</select>`:''}
+${S.grp?`<label>Group</label><select name="_g"><option value="">No group</option>${GR.filter(g=>g.t==t).map(g=>`<option value="${g.id}" ${x.g==g.id?'selected':''}>${esc(g.n)}</option>`).join('')}</select>`:''}
 ${S.p?`<label>Progress (%)</label><input name="_p" type="number" min="0" max="100" value="${x.p||0}">`:''}
 ${cf.map(f=>`<label>${esc(f.l)}</label>${f.t=='checkbox'?`<input type="checkbox" name="c_${f.id}" style="width:auto" ${c[f.id]?'checked':''}>`:f.t=='select'?`<select name="c_${f.id}"><option value=""></option>${(f.o||[]).map(o=>`<option ${c[f.id]==o?'selected':''}>${esc(o)}</option>`).join('')}</select>`:`<input name="c_${f.id}" type="${f.t=='number'?'number':f.t=='date'?'date':'text'}" value="${esc(c[f.id])}">`}`).join('')}
 <label>Deadlines</label><div id="dlrows">${(x.dl||[]).map(dlrow).join('')}</div><button type="button" class="btn" data-a="dladd" style="margin-top:6px">${ic('plus')} Add deadline</button>
@@ -269,18 +287,18 @@ const SL=$('#sl');SL.style.top=document.querySelector('header').offsetHeight+'px
 if(window.lucide)lucide.createIcons()}
 let SH=true,Z=30;
 function defPos(k,i,W,H){const L=$('#sl');W=W||L.clientWidth;H=H||L.clientHeight;const c=i%5;return k=='n'?{x:Math.max(8,W-250-c*30),y:16+c*36}:{x:Math.max(8,W-180-c*30),y:Math.max(8,H-170-c*30)}}
-const noteHTML=(n,p)=>`<div class="note" data-id="${n.id}" style="${p};--r:${n.r||0}deg"><span class="dh" title="Drag to move — it snaps into place">⠿ DRAG</span><button class="x" data-a="sdel" data-id="${n.id}" title="Remove note">×</button><textarea data-sid="${n.id}" placeholder="Sticky note — jot something down…">${esc(n.t)}</textarea>
+const noteHTML=(n,p)=>`<div class="note" data-id="${n.id}" style="${p};--r:${n.r||0}deg;${n.w?`width:${n.w}px;`:''}${n.h?`height:${n.h}px`:''}"><span class="dh" title="Drag to move — it snaps into place">⠿ DRAG</span><button class="x" data-a="sdel" data-id="${n.id}" title="Remove note">×</button><textarea data-sid="${n.id}" placeholder="Sticky note — jot something down…">${esc(n.t)}</textarea>
 ${(n.l||[]).map(i=>`<div class="ck"><input type="checkbox" data-cid="${n.id}" data-iid="${i.id}" ${i.d?'checked':''}><input class="ct ${i.d?'d2':''}" data-nid="${n.id}" data-iid="${i.id}" value="${esc(i.t)}" placeholder="List item"><button class="x2" data-a="cdel" data-id="${n.id}" data-i="${i.id}" title="Remove item">×</button></div>`).join('')}
-<div class="nb"><button data-a="cadd" data-id="${n.id}">☐ LIST</button></div></div>`;
-const picHTML=(p,pos)=>`<div class="pol" data-id="${p.id}" style="${pos}"><img src="${p.d}" alt="" draggable="false"><button class="x2" data-a="idel" data-i="${p.id}" title="Remove picture">×</button></div>`;
+<div class="nb"><button data-a="cadd" data-id="${n.id}">☐ LIST</button></div><span class="rz" title="Drag to resize"></span></div>`;
+const picHTML=(p,pos)=>`<div class="pol" data-id="${p.id}" style="${pos}${p.w?`;width:${p.w}px`:''}"><img src="${p.d}" alt="" draggable="false"><button class="x2" data-a="idel" data-i="${p.id}" title="Remove picture">×</button><span class="rz" title="Drag to resize"></span></div>`;
 function layerHTML(){if(view=='dashboard'||view=='vault'||!SH)return '';const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,n=st[view]||[],p=pics[view]||[];let dn=false,dp=false;
-const pos=(it,k,i)=>{if(typeof it.x!='number'||typeof it.y!='number'){Object.assign(it,defPos(k,i,W,H));k=='n'?dn=true:dp=true}return `left:${Math.max(0,Math.min(it.x,W-(k=='n'?220:150)))}px;top:${Math.max(0,Math.min(it.y,H-(k=='n'?150:130)))}px`};
+const pos=(it,k,i)=>{if(typeof it.x!='number'||typeof it.y!='number'){Object.assign(it,defPos(k,i,W,H));k=='n'?dn=true:dp=true}return `left:${Math.max(0,Math.min(it.x,W-(it.w||(k=='n'?220:150))))}px;top:${Math.max(0,Math.min(it.y,H-(k=='n'?150:130)))}px`};
 const h=n.map((o,i)=>noteHTML(o,pos(o,'n',i))).join('')+p.map((o,i)=>picHTML(o,pos(o,'p',i))).join('');if(dn)saveSt();if(dp)savePic();return h}
 const GRID=24,TH=14;
 const snapAxis=(v,c)=>{let b=v,d=TH+1;for(const k of c){const t=Math.abs(k-v);if(t<d){d=t;b=k}}return d<=TH?b:v};
 let PD=null;
 function showPic(id){const p=(pics[view]||[]).find(o=>o.id==id);if(p)modal(`<img src="${p.d}" alt="" style="width:100%;display:block"><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-a="x2">Close</button></div>`)}
-document.addEventListener('pointerdown',e=>{const h=e.target.closest&&e.target.closest('.dh,.pol');if(!h||e.target.closest('button,input,textarea'))return;const el=h.closest('.note,.pol'),k=el.classList.contains('note')?'n':'p',it=(k=='n'?st[view]:pics[view]).find(o=>o.id==el.dataset.id);if(!it)return;
+document.addEventListener('pointerdown',e=>{const h=e.target.closest&&e.target.closest('.dh,.pol');if(!h||e.target.closest('button,input,textarea,.rz'))return;const el=h.closest('.note,.pol'),k=el.classList.contains('note')?'n':'p',it=(k=='n'?st[view]:pics[view]).find(o=>o.id==el.dataset.id);if(!it)return;
 PD={el,it,k,sx:e.clientX,sy:e.clientY,ox:el.offsetLeft,oy:el.offsetTop,moved:false,id:e.pointerId};el.classList.add('drag');el.style.zIndex=++Z;e.preventDefault()});
 document.addEventListener('pointermove',e=>{if(!PD||e.pointerId!=PD.id)return;const dx=e.clientX-PD.sx,dy=e.clientY-PD.sy;if(Math.abs(dx)+Math.abs(dy)>4)PD.moved=true;if(!PD.moved)return;
 const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,w=PD.el.offsetWidth,h=PD.el.offsetHeight,cx=[8,W-w-8],cy=[8,H-h-8];
@@ -292,6 +310,19 @@ const endDrag=()=>{if(!PD)return;const d=PD;PD=null;d.el.classList.remove('drag'
 document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);
 window.addEventListener('resize',()=>{if(SH&&view!='dashboard')$('#sl').innerHTML=layerHTML()});
 
+function grpSave(f){const n=(new FormData(f).get('n')||'').trim();if(!n)return;const g=GR.find(o=>o.id==f.dataset.id);if(g)g.n=n;else{const ng={id:uid(),t:f.dataset.t||'websites',n};GR.push(ng)}persist();modal('');render()}
+let WD=null;const clrOver=()=>document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
+document.addEventListener('dragstart',e=>{const c=e.target.closest&&e.target.closest('[data-wid]');if(!c)return;WD=c.dataset.wid;if(e.dataTransfer){e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',WD)}catch(x){}}});
+document.addEventListener('dragover',e=>{if(!WD)return;const f=e.target.closest('[data-gid]');if(f){e.preventDefault();clrOver();f.classList.add('over')}});
+document.addEventListener('drop',e=>{if(!WD)return;const f=e.target.closest('[data-gid]');if(f){e.preventDefault();const x=db.find(o=>o.id==WD);if(x){x.g=f.dataset.gid||'';save();toast(x.g?'Moved to “'+gname(x.g)+'”':'Removed from group')}}WD=null;clrOver();render()});
+document.addEventListener('dragend',()=>{WD=null;clrOver()});
+let RS=null;
+document.addEventListener('pointerdown',e=>{const z=e.target.closest&&e.target.closest('.rz');if(!z)return;const el=z.parentElement,k=el.classList.contains('note')?'n':'p',it=(k=='n'?st[view]:pics[view]).find(o=>o.id==el.dataset.id);if(!it)return;RS={el,it,k,sx:e.clientX,sy:e.clientY,ow:el.offsetWidth,oh:el.offsetHeight,id:e.pointerId};el.style.zIndex=++Z;e.preventDefault()});
+document.addEventListener('pointermove',e=>{if(!RS||e.pointerId!=RS.id)return;const L=$('#sl'),W=L.clientWidth,H=L.clientHeight,c=(v,a,b)=>Math.max(a,Math.min(b,v));
+const w=c(RS.ow+e.clientX-RS.sx,RS.k=='n'?160:90,Math.max(160,Math.min(560,W-RS.el.offsetLeft)));RS.el.style.width=w+'px';RS.nw=w;
+if(RS.k=='n'){const h=c(RS.oh+e.clientY-RS.sy,110,Math.max(110,Math.min(700,H-RS.el.offsetTop)));RS.el.style.height=h+'px';RS.nh=h}});
+const endRs=()=>{if(!RS)return;const r=RS;RS=null;if(r.nw)r.it.w=r.nw;if(r.nh)r.it.h=r.nh;if(r.nw||r.nh)(r.k=='n'?saveSt:savePic)()};
+document.addEventListener('pointerup',endRs);document.addEventListener('pointercancel',endRs);
 const clip=t=>{try{navigator.clipboard.writeText(t)}catch(e){}};
 document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){$('.mn')?.remove();return go(g.dataset.go)}
 const a=e.target.closest('[data-a]');if(!a){$('.mn')?.remove();return}const A=a.dataset.a,id=a.dataset.id,x=db.find(o=>o.id==id);
@@ -306,6 +337,12 @@ else if(A=='del')ask(id);
 else if(A=='del2'){db=db.filter(o=>o.id!=id);save();modal('');render()}
 else if(A=='fav'){x.fav=!x.fav;save();render()}
 else if(A=='skin'){setSkin(a.dataset.k);render()}
+else if(A=='gopen'){gview=id||'';render()}
+else if(A=='gnew'||A=='grename'){const g=GR.find(o=>o.id==id);$('.mn')?.remove();modal(`<form id="gf" data-id="${g?g.id:''}" data-t="${esc(a.dataset.t||'websites')}"><h1>${g?'Rename':'New'} group</h1><label>Group name</label><input name="n" required maxlength="40" value="${esc(g?g.n:'')}" placeholder="e.g. Programming tutorials"><div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">${g?'Save':'Create'}</button></div></form>`);$('#gf input').focus()}
+else if(A=='gdel'){const g=GR.find(o=>o.id==id);modal(`<h1>Delete group?</h1><p class="mu">“${esc(g.n)}” will be deleted. The websites inside it are kept and move back to “Not in a group”.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="gdel2" data-id="${id}">Delete group</button></div>`)}
+else if(A=='gdel2'){GR=GR.filter(g=>g.id!=id);db.forEach(x=>{if(x.g==id)x.g=''});gview='';persist();modal('');render()}
+else if(A=='gall'){const l=db.filter(x=>x.type=='websites'&&x.g==gview&&x.f.url);l.forEach(x=>window.open(norm(x.f.url),'_blank','noopener'));toast(l.length?'Opened '+l.length+' tabs — if only one opened, allow pop-ups for this site.':'No links in this group.')}
+else if(A=='wview'){WC().view=a.dataset.v;persist();render()}
 else if(A=='dladd'){$('#dlrows').insertAdjacentHTML('beforeend',dlrow({}));if(window.lucide)lucide.createIcons()}
 else if(A=='dlrm')a.closest('.dlrow').remove();
 else if(A=='cfadd'){const t=a.dataset.t,n=$('#cn-'+t).value.trim(),ty=$('#ct-'+t).value;if(!n)return toast('Give the field a name.');(CFG.fields[t]=CFG.fields[t]||[]).push({id:uid(),l:n,t:ty,o:ty=='select'?$('#co-'+t).value.split(',').map(s=>s.trim()).filter(Boolean):undefined});persist();render()}
@@ -332,7 +369,7 @@ else if(A=='bexp'){exportAll().catch(e=>toast('Export failed: '+(e.message||e)))
 else if(A=='bimp'){pickJson().then(j=>j&&confirmImport(j))}
 else if(A=='bimp2'){modal('');importApply().catch(e=>toast('Import failed: '+(e.message||e)))}
 else if(A=='clr')modal(`<h1>Delete all data?</h1><p class="mu">This removes every entry, sticker, library file and the password vault from this device.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="clr2">Delete all</button></div>`);
-else if(A=='clr2'){db=[];st={};pics={};vault=null;CFG={status:{},fields:{}};VT={key:null,items:[],q:'',err:'',show:{},tm:null};FL=[];modal('');idb('files','readwrite',s=>s.clear()).then(flush).then(render)}
+else if(A=='clr2'){db=[];st={};pics={};vault=null;GR=[];CFG={status:{},fields:{}};VT={key:null,items:[],q:'',err:'',show:{},tm:null};FL=[];modal('');idb('files','readwrite',s=>s.clear()).then(flush).then(render)}
 else if(A=='vadd')vform();else if(A=='vedit')vform(id);
 else if(A=='vdel'){const v=VT.items.find(o=>o.id==id);modal(`<h1>Delete password?</h1><p class="mu">“${esc(v.s)}” will be removed from the vault.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-a="x2">Cancel</button><button class="btn pri" style="background:var(--dn);border-color:var(--dn)" data-a="vdel2" data-id="${id}">Delete</button></div>`)}
 else if(A=='vdel2'){VT.items=VT.items.filter(o=>o.id!=id);modal('');vSeal().then(render)}
@@ -345,9 +382,9 @@ else if(A=='tswap'){const f=tr.f=='Auto-detect'?'English':tr.f;tr.f=tr.t;tr.t=f;
 else if(A=='tcopy'){const o=$('#to');if(o&&o.value){o.select();clip(o.value);try{document.execCommand('copy')}catch(e){}}}
 else if(A=='tgo'){if(!tr.i.trim()||tr.b)return;tr.b=true;tr.e='';tr.o='';render();gtr(tr.i,tr.f,tr.t).then(o=>tr.o=o).catch(e=>tr.e=e.message||'Translation failed — try again.').finally(()=>{tr.b=false;if(view=='translate')render()})}});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target;
-if(f.id=='sf')return subjSave(f);if(f.id=='vs')return vSetup(f);if(f.id=='vu')return vUnlock(f);if(f.id=='vp')return vChange(f);if(f.id=='vf')return vSave(f);if(f.id!='fm')return;
+if(f.id=='sf')return subjSave(f);if(f.id=='gf')return grpSave(f);if(f.id=='vs')return vSetup(f);if(f.id=='vu')return vUnlock(f);if(f.id=='vp')return vChange(f);if(f.id=='vf')return vSave(f);if(f.id!='fm')return;
 const t=f.dataset.t,v=Object.fromEntries(new FormData(f)),S=SC[t],o=db.find(x=>x.id==f.dataset.id)||(t=='university'&&db.find(x=>x.type==t))||{id:uid(),type:t,at:Date.now(),fav:false},nf={};
-S.f.forEach(([k])=>nf[k]=(v[k]||'').trim());o.f=nf;o.status=v._s||'';o.p=Math.max(0,Math.min(100,+v._p||0));o.tags=(v._t||'').split(',').map(s=>s.trim().replace(/^#/,'')).filter(Boolean);
+S.f.forEach(([k])=>nf[k]=(v[k]||'').trim());o.f=nf;o.status=v._s||'';if(S.grp)o.g=v._g||'';o.p=Math.max(0,Math.min(100,+v._p||0));o.tags=(v._t||'').split(',').map(s=>s.trim().replace(/^#/,'')).filter(Boolean);
 o.c={};(CFG.fields[t]||[]).forEach(cf=>{const el=f.querySelector('[name="c_'+cf.id+'"]');o.c[cf.id]=cf.t=='checkbox'?el.checked:(el.value||'').trim()});
 o.dl=[...f.querySelectorAll('.dlrow')].map(r=>({id:r.dataset.id||uid(),t:r.querySelector('[name=dt]').value.trim(),d:r.querySelector('[name=dd]').value,done:r.querySelector('.dcb').checked})).filter(d=>d.d);
 if(!db.includes(o))db.push(o);save();modal('');render()});
@@ -359,7 +396,7 @@ document.addEventListener('change',e=>{const T=e.target;
 if(T.dataset.dd){const x=db.find(o=>o.id==T.dataset.dd),d=x&&(x.dl||[]).find(o=>o.id==T.dataset.k);if(d){d.done=T.checked;save();render()}return}
 if(T.dataset.cid){const i=st[view].find(o=>o.id==T.dataset.cid).l.find(o=>o.id==T.dataset.iid);i.d=T.checked;saveSt();render();return}
 if(T.dataset.cs){CFG.status[T.dataset.cs]=T.value.split(',').map(s=>s.trim()).filter(Boolean);persist();render();return}
-if(T.id=='tf'||T.id=='tt'){tr[T.id=='tf'?'f':'t']=T.value;saveTr();return}if(T.id=='fs'){sf=T.value;render()}});
+if(T.id=='ws'){WC().sort=T.value;persist();render();return}if(T.id=='wi'){WC().icons=T.checked;persist();render();return}if(T.id=='tf'||T.id=='tt'){tr[T.id=='tf'?'f':'t']=T.value;saveTr();return}if(T.id=='fs'){sf=T.value;render()}});
 document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.dataset.nid){e.preventDefault();const n=st[view].find(o=>o.id==e.target.dataset.nid);n.l.push({id:uid(),d:false,t:''});saveSt();render();const t=document.querySelectorAll('.ct');t[t.length-1].focus();return}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();pal()}if(e.key=='Escape')modal('')});
 ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,vkick,true));
 addEventListener('pagehide',flush);document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
