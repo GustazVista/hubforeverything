@@ -122,6 +122,7 @@ main{position:relative}
 .md.wide{max-width:780px}.rd h2{margin:18px 0 8px}.rbody{white-space:pre-wrap;word-break:break-word}
 .snote{border:1px dashed var(--bd);padding:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px}.snote input,.snote textarea{margin:0}
 .cd[data-a=open]{cursor:pointer}.rd a{color:var(--ac)}
+.sub{margin:0 0 6px 20px;border-left:1px dashed var(--bd)}.nv.sn{padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0}.nv.sn.add{color:var(--ac);opacity:.8}
 </style></head>
 <body><div id="app"><aside><div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>KNOWLEDGE//HUB</span></div><nav id="nav"></nav></aside>
 <main><header><button class="btn ic" data-a="tog" title="Toggle sidebar"><i data-lucide="panel-left"></i></button>
@@ -282,9 +283,10 @@ ${cf.map(f=>`<label>${esc(f.l)}</label>${f.t=='checkbox'?`<input type="checkbox"
 <label>Deadlines</label><div id="dlrows">${(x.dl||[]).map(dlrow).join('')}</div><button type="button" class="btn" data-a="dladd" style="margin-top:6px">${ic('plus')} Add deadline</button>
 <label>Tags (comma separated)</label><input name="_t" value="${esc((x.tags||[]).join(', '))}">
 <div class="row" style="margin-top:16px;justify-content:flex-end"><button type="button" class="btn" data-a="x2">Cancel</button><button class="btn pri">Save</button></div></form>`);const f=$('#fm input');if(f)f.focus()}
-function render(){const g=(h,a)=>`<div class="gh">${h}</div>`+a.map(([k,l,i,n])=>`<button class="nv ${view==k?'on':''}" data-go="${k}" title="${l}">${ic(i)}<span class="lb">${l}</span>${n?`<em class="lb">${n}</em>`:''}</button>`).join('');
+const subNav=()=>{const u=db.find(x=>x.type=='university');if(!u)return '';return `<div class="sub lb">${(u.subjects||[]).map(j=>{const o=(j.dl||[]).filter(d=>!d.done).length;return `<button class="nv sn" data-a="sjnav" data-id="${j.id}" title="${esc(j.n)}"><span class="lb">${esc(j.n)}</span>${o?`<em class="lb" title="Open deadlines">${o}</em>`:''}</button>`}).join('')}<button class="nv sn add" data-a="sjadd"><span class="lb">+ Add subject</span></button></div>`};
+function render(){const g=(h,a)=>`<div class="gh">${h}</div>`+a.map(([k,l,i,n,sub])=>`<button class="nv ${view==k?'on':''}" data-go="${k}" title="${l}">${ic(i)}<span class="lb">${l}</span>${n?`<em class="lb">${n}</em>`:''}</button>${sub||''}`).join('');
 $('#app').className=col?'c':'';
-$('#nav').innerHTML=g('Main',[['dashboard','Dashboard','layout-dashboard'],['favorites','Favorites','star',db.filter(x=>x.fav).length||''],['calendar','Deadlines','calendar',dls().filter(o=>!o.done).length||'']])+g('Knowledge',Object.entries(SC).map(([k,s])=>[k,s.l,s.i,db.filter(x=>x.type==k).length||'']))+g('Tools',[['library','Library','archive',FL.length||''],['translate','Translator','languages'],['vault','Password Manager','key']])+g('System',[['settings','Settings','settings']])+`<div class="mu lb" id="sy" style="padding:14px 10px 0">${esc(SAVED)}</div>`;
+$('#nav').innerHTML=g('Main',[['dashboard','Dashboard','layout-dashboard'],['favorites','Favorites','star',db.filter(x=>x.fav).length||''],['calendar','Deadlines','calendar',dls().filter(o=>!o.done).length||'']])+g('Knowledge',Object.entries(SC).map(([k,s])=>[k,s.l,s.i,db.filter(x=>x.type==k).length||'',k=='university'?subNav():'']))+g('Tools',[['library','Library','archive',FL.length||''],['translate','Translator','languages'],['vault','Password Manager','key']])+g('System',[['settings','Settings','settings']])+`<div class="mu lb" id="sy" style="padding:14px 10px 0">${esc(SAVED)}</div>`;
 $('#body').innerHTML=view=='university'?uni():SC[view]?listView(view):({dashboard:dash,favorites:favs,calendar:cal,settings:sets,library:libv,translate:trv,vault:vview})[view]();
 const SL=$('#sl');SL.style.top=document.querySelector('header').offsetHeight+'px';SL.innerHTML=layerHTML();document.querySelectorAll('.sbtn').forEach(b=>b.style.display=(view=='dashboard'||view=='vault')?'none':'');
 if(window.lucide)lucide.createIcons()}
@@ -362,6 +364,7 @@ else if(A=='del2'){db=db.filter(o=>o.id!=id);save();modal('');render()}
 else if(A=='fav'){x.fav=!x.fav;save();render();refreshModal()}
 else if(A=='skin'){setSkin(a.dataset.k);render()}
 else if(A=='stop'){}
+else if(A=='sjnav'){go('university');sjopen(id,null)}
 else if(A=='open'){if(!x)return;if(x.type=='university'){modal('');go('university')}else reader(id)}
 else if(A=='redit'){BACK=id;form(x.type,id)}
 else if(A=='rdadd'){const d=$('#rdd').value;if(!d)return toast('Pick a date first.');(x.dl=x.dl||[]).push({id:uid(),t:$('#rdt').value.trim()||'Deadline',d,done:false});save();render();reader(id)}
